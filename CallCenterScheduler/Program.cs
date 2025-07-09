@@ -11,7 +11,7 @@ class Program
         // C
         int numOfTopCategories = 2;
         // N
-        int numOfWorkers = 2;
+        int numOfWorkers = 3;
 
         string? input;
         while (true)
@@ -96,7 +96,7 @@ class Program
         {
             if (!objGroup.IsCompleted)
             {
-                for (int i = 0; i < objGroup.PrerequisiteGroups.Count; i++)
+                for (int i = 0; i< objGroup.PrerequisiteGroups.Count; i++)
                 {
                     var unfinishedGroup = p_objListOfGroups.FirstOrDefault(g => g.Name == objGroup.PrerequisiteGroups[i].Name
                                                                             && g.Category == objGroup.PrerequisiteGroups[i].Category
@@ -109,50 +109,35 @@ class Program
                 }
 
                 FinishWork(objGroup, GetAvailableWorker(workers));
-
-                //AssignWork(p_objListOfGroups, objGroup, workers);
-
-                // Perform prerequisites first
-                //for (int i = 0; i < objGroup.PrerequisiteGroups.Count; i++)
-                //{
-                //    var unfinishedGroup = p_objListOfGroups.FirstOrDefault(g => g.Name == objGroup.PrerequisiteGroups[i].Name && !g.IsCompleted);
-                //    if (unfinishedGroup != null)
-                //    {
-                //        var worker = GetAvailableWorker(workers);
-                //        worker.timeSpent += objGroup.RequiredTime;
-                //    }
-                //}
-
-                //objGroup.IsCompleted = true;
             }
         }
 
-        return string.Empty;
+        var highestTime = workers.OrderBy(w => w.TimeSpent).First();
+
+        return highestTime.TimeSpent.ToString();
     }
 
     static void AssignWork(List<Group> p_objListOfGroups, Group objGroup, Worker[] workers)
     {
-        if (!objGroup.IsCompleted)
+        for (int i = 0; i < objGroup.PrerequisiteGroups.Count; i++)
         {
-            var unfinishedGroup = p_objListOfGroups.FirstOrDefault(g => g.Name.Equals(objGroup.Name) && !g.IsCompleted);
+            var unfinishedGroup = p_objListOfGroups.FirstOrDefault(g => g.Name == objGroup.PrerequisiteGroups[i].Name
+                                                                    && g.Category == objGroup.PrerequisiteGroups[i].Category
+                                                                    && !g.IsCompleted);
 
             if (unfinishedGroup != null)
             {
-                AssignWork(p_objListOfGroups, objGroup, workers);
-
-                //var worker = GetAvailableWorker(workers);
-                //worker.timeSpent += objGroup.RequiredTime;
-                //unfinishedGroup.IsCompleted = true;
+                AssignWork(p_objListOfGroups, unfinishedGroup, workers);
             }
-            else
-                FinishWork(objGroup, GetAvailableWorker(workers));
         }
+
+        FinishWork(objGroup, GetAvailableWorker(workers));
     }
 
     static void FinishWork(Group p_objGroup, Worker p_objWorker)
     {
         p_objGroup.IsCompleted = true;
-        p_objWorker.timeSpent += p_objGroup.RequiredTime;
+        p_objWorker.TimeSpent += p_objGroup.RequiredTime;
     }
 
     static Worker[] InitWorkers(int p_intNumber)
@@ -165,14 +150,14 @@ class Program
 
     static Worker GetAvailableWorker(Worker[] p_objWorkers)
     {
-        return p_objWorkers.OrderBy(t => t.timeSpent).First();
+        return p_objWorkers.OrderBy(t => t.TimeSpent).First();
     }
 }
 
 public class Worker
 {
     public bool IsWorking { get; set; }
-    public int timeSpent { get; set; }
+    public int TimeSpent { get; set; }
 }
 
 // Class for group of customers with conditions
@@ -186,8 +171,8 @@ public class Group : GroupBase
 // Class for group of customers
 public class GroupBase
 {
-    public required string Category { get; set; }
-    public required string Name { get; set; }
+    public string Category { get; set; }
+    public string Name { get; set; }
 }
 
 public class ParsedInput
