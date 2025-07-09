@@ -95,24 +95,10 @@ class Program
         foreach (Group objGroup in p_objListOfGroups)
         {
             if (!objGroup.IsCompleted)
-            {
-                for (int i = 0; i< objGroup.PrerequisiteGroups.Count; i++)
-                {
-                    var unfinishedGroup = p_objListOfGroups.FirstOrDefault(g => g.Name == objGroup.PrerequisiteGroups[i].Name
-                                                                            && g.Category == objGroup.PrerequisiteGroups[i].Category
-                                                                            && !g.IsCompleted);
-
-                    if (unfinishedGroup != null)
-                    {
-                        AssignWork(p_objListOfGroups, unfinishedGroup, workers);
-                    }
-                }
-
-                FinishWork(objGroup, GetAvailableWorker(workers));
-            }
+                AssignWork(p_objListOfGroups, objGroup, workers);
         }
 
-        var highestTime = workers.OrderBy(w => w.TimeSpent).First();
+        var highestTime = workers.OrderByDescending(w => w.TimeSpent).First();
 
         return highestTime.TimeSpent.ToString();
     }
@@ -126,9 +112,7 @@ class Program
                                                                     && !g.IsCompleted);
 
             if (unfinishedGroup != null)
-            {
                 AssignWork(p_objListOfGroups, unfinishedGroup, workers);
-            }
         }
 
         FinishWork(objGroup, GetAvailableWorker(workers));
@@ -138,6 +122,7 @@ class Program
     {
         p_objGroup.IsCompleted = true;
         p_objWorker.TimeSpent += p_objGroup.RequiredTime;
+        p_objWorker.FinishedGroups.Add(p_objGroup);
     }
 
     static Worker[] InitWorkers(int p_intNumber)
@@ -158,6 +143,9 @@ public class Worker
 {
     public bool IsWorking { get; set; }
     public int TimeSpent { get; set; }
+
+    // For debugging purpose
+    public List<Group> FinishedGroups = new List<Group>();
 }
 
 // Class for group of customers with conditions
