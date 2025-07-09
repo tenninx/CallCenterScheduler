@@ -4,6 +4,9 @@ using System.Linq;
 
 class Program
 {
+    static int CurrentTime = 0;
+    static Worker[] Workers;
+
     public static void Main()
     {
         // G
@@ -90,20 +93,20 @@ class Program
 
     static string Schedule(int G, int C, int N, List<Group> p_objListOfGroups)
     {
-        Worker[] workers = InitWorkers(N);
+        Workers = InitWorkers(N);
 
         foreach (Group objGroup in p_objListOfGroups)
         {
             if (!objGroup.IsCompleted)
-                AssignWork(p_objListOfGroups, objGroup, workers);
+                AssignWork(p_objListOfGroups, objGroup);
         }
 
-        var highestTime = workers.OrderByDescending(w => w.TimeSpent).First();
+        var highestTime = Workers.OrderByDescending(w => w.TimeSpent).First();
 
         return highestTime.TimeSpent.ToString();
     }
 
-    static void AssignWork(List<Group> p_objListOfGroups, Group objGroup, Worker[] workers)
+    static void AssignWork(List<Group> p_objListOfGroups, Group objGroup)
     {
         for (int i = 0; i < objGroup.PrerequisiteGroups.Count; i++)
         {
@@ -112,37 +115,58 @@ class Program
                                                                     && !g.IsCompleted);
 
             if (unfinishedGroup != null)
-                AssignWork(p_objListOfGroups, unfinishedGroup, workers);
+                AssignWork(p_objListOfGroups, unfinishedGroup);
         }
 
-        FinishWork(objGroup, GetAvailableWorker(workers));
+        FinishWork(objGroup);
     }
 
-    static void FinishWork(Group p_objGroup, Worker p_objWorker)
+    static void FinishWork(Group p_objGroup)
     {
+        Worker worker = GetAvailableWorker(p_objGroup.RequiredTime);
+
         p_objGroup.IsCompleted = true;
-        p_objWorker.TimeSpent += p_objGroup.RequiredTime;
-        p_objWorker.FinishedGroups.Add(p_objGroup);
+        worker.TimeSpent += p_objGroup.RequiredTime;
+        worker.FinishedGroups.Add(p_objGroup);
+        worker.IsWorking = false;
     }
 
     static Worker[] InitWorkers(int p_intNumber)
     {
         Worker[] workers = new Worker[p_intNumber];
         for (int i = 0; i < p_intNumber; i++)
+        {
             workers[i] = new Worker();
+            workers[i].ID = i;
+        }
         return workers;
     }
 
-    static Worker GetAvailableWorker(Worker[] p_objWorkers)
+    static Worker GetAvailableWorker(int p_intTimeNeeded)
     {
-        return p_objWorkers.OrderBy(t => t.TimeSpent).First();
+        var worker = Workers.FirstOrDefault(w => !w.IsWorking && w.NextAvailableTime <= CurrentTime);
+        if (worker != null)
+        {
+            worker.NextAvailableTime = CurrentTime + p_intTimeNeeded;
+            worker.IsWorking = true;
+
+            return worker;
+        }
+
+        worker = Workers.OrderBy(t => t.NextAvailableTime).First();
+        CurrentTime = worker.NextAvailableTime;
+        worker.NextAvailableTime = CurrentTime + p_intTimeNeeded;
+
+        return worker;
     }
 }
 
 public class Worker
 {
+    public int ID { get; set; }
     public bool IsWorking { get; set; }
     public int TimeSpent { get; set; }
+    public int NextAvailableTime { get; set; }
 
     // For debugging purpose
     public List<Group> FinishedGroups = new List<Group>();
