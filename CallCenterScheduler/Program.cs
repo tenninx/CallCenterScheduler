@@ -4,7 +4,7 @@ using System.Linq;
 
 class Program
 {
-    static int CurrentTime = 0;
+    static int CurrentTime;
     static Worker[] Workers;
 
     public static void Main()
@@ -19,6 +19,7 @@ class Program
         string? input;
         while (true)
         {
+            CurrentTime = 0;
             Console.WriteLine("Enter the input in the following format: A string of semicolon-separated data in the form \"category,group,time\" followed by zero or more prerequisites of the form \",category,group\", empty input to terminate:");
             input = Console.ReadLine();
 
@@ -39,8 +40,11 @@ class Program
         }
     }
 
-    // Sample Input: "Home,OR Jefferson,5444;Medicare,OR Lake,1304;Medicare,WA King,43061;Life,OR Other,12806,Medicare,OR Lake;Life,WA Other,70944,Medicare,WA King,Life,OR Other"
-
+    /// <summary>
+    /// Parse text input from console into data objects
+    /// </summary>
+    /// <param name="p_strInput">Text input from console</param>
+    /// <returns>Parsed data object</returns>
     static ParsedInput ParseInput(string p_strInput)
     {
         var objResult = new ParsedInput();
@@ -51,33 +55,33 @@ class Program
 
         foreach (var strGroup in strGroups)
         {
-            string[] strGDetails = strGroup.Split(',');
+            string[] strGroupDetails = strGroup.Split(',');
             List<GroupBase> objPrereqs = new List<GroupBase>();
 
-            if (strGDetails.Length < 3)
+            if (strGroupDetails.Length < 3)
                 return new ParsedInput { ErrorMessage = "Invalid group of customers input." };
 
-            if (!int.TryParse(strGDetails[2], out int time))
+            if (!int.TryParse(strGroupDetails[2], out int time))
                 return new ParsedInput { ErrorMessage = "Invalid required time input." };
 
-            if (strGDetails.Length > 3 && (strGDetails.Length - 3) % 2 != 0)
+            if (strGroupDetails.Length > 3 && (strGroupDetails.Length - 3) % 2 != 0)
                 return new ParsedInput { ErrorMessage = "Invalid prerequisites input." };
-            else if (strGDetails.Length > 3)
+            else if (strGroupDetails.Length > 3)
             {
-                for (int i = 3; i < strGDetails.Length; i++)
+                for (int i = 3; i < strGroupDetails.Length; i++)
                 {
                     objPrereqs.Add(new GroupBase
                     {
-                        Category = strGDetails[i],
-                        Name = strGDetails[++i]
+                        Category = strGroupDetails[i],
+                        Name = strGroupDetails[++i]
                     });
                 }
             }
 
             Group objGroup = new Group
             {
-                Category = strGDetails[0],
-                Name = strGDetails[1],
+                Category = strGroupDetails[0],
+                Name = strGroupDetails[1],
                 RequiredTime = time,
                 PrerequisiteGroups = objPrereqs
             };
@@ -98,37 +102,36 @@ class Program
         foreach (Group objGroup in p_objListOfGroups)
         {
             if (!objGroup.IsCompleted)
-                AssignWork(p_objListOfGroups, objGroup);
+                StartCalling(p_objListOfGroups, objGroup);
         }
 
-        var highestTime = Workers.OrderByDescending(w => w.TimeSpent).First();
+        var highestTime = Workers.OrderByDescending(w => w.NextAvailableTime).First();
 
-        return highestTime.TimeSpent.ToString();
+        return highestTime.NextAvailableTime.ToString();
     }
 
-    static void AssignWork(List<Group> p_objListOfGroups, Group objGroup)
+    static void StartCalling(List<Group> p_objListOfGroups, Group p_objGroup)
     {
-        for (int i = 0; i < objGroup.PrerequisiteGroups.Count; i++)
+        for (int i = 0; i < p_objGroup.PrerequisiteGroups.Count; i++)
         {
-            var unfinishedGroup = p_objListOfGroups.FirstOrDefault(g => g.Name == objGroup.PrerequisiteGroups[i].Name
-                                                                    && g.Category == objGroup.PrerequisiteGroups[i].Category
+            var unfinishedGroup = p_objListOfGroups.FirstOrDefault(g => g.Name == p_objGroup.PrerequisiteGroups[i].Name
+                                                                    && g.Category == p_objGroup.PrerequisiteGroups[i].Category
                                                                     && !g.IsCompleted);
 
             if (unfinishedGroup != null)
-                AssignWork(p_objListOfGroups, unfinishedGroup);
+                StartCalling(p_objListOfGroups, unfinishedGroup);
         }
 
-        FinishWork(objGroup);
+        AssignWorker(p_objGroup);
     }
 
-    static void FinishWork(Group p_objGroup)
+    static void AssignWorker(Group p_objGroup)
     {
         Worker worker = GetAvailableWorker(p_objGroup.RequiredTime);
-
-        p_objGroup.IsCompleted = true;
         worker.TimeSpent += p_objGroup.RequiredTime;
         worker.FinishedGroups.Add(p_objGroup);
-        worker.IsWorking = false;
+        
+        p_objGroup.IsCompleted = true;
     }
 
     static Worker[] InitWorkers(int p_intNumber)
@@ -144,11 +147,10 @@ class Program
 
     static Worker GetAvailableWorker(int p_intTimeNeeded)
     {
-        var worker = Workers.FirstOrDefault(w => !w.IsWorking && w.NextAvailableTime <= CurrentTime);
+        var worker = Workers.FirstOrDefault(w => w.NextAvailableTime <= CurrentTime);
         if (worker != null)
         {
             worker.NextAvailableTime = CurrentTime + p_intTimeNeeded;
-            worker.IsWorking = true;
 
             return worker;
         }
@@ -164,11 +166,8 @@ class Program
 public class Worker
 {
     public int ID { get; set; }
-    public bool IsWorking { get; set; }
     public int TimeSpent { get; set; }
     public int NextAvailableTime { get; set; }
-
-    // For debugging purpose
     public List<Group> FinishedGroups = new List<Group>();
 }
 
