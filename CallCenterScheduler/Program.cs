@@ -33,7 +33,7 @@ class Program
             }
             else
             {
-                Schedule(numOfWorkers, parsedInput.GroupOfCustomers);
+                Schedule(parsedInput.GroupOfCustomers, numOfWorkers);
 
                 var result = GenerateResult(numOfTopGroups, numOfTopCategories, parsedInput.GroupOfCustomers);
 
@@ -97,35 +97,43 @@ class Program
         return objResult;
     }
 
-    static void Schedule(int N, List<Group> p_objListOfGroups)
+    static void Schedule(List<Group> p_objListOfGroups, int N)
     {
         Workers = InitWorkers(N);
 
-        foreach (Group objGroup in p_objListOfGroups)
+        Queue<Group> p_objQueueOfGroups = new Queue<Group>(p_objListOfGroups.OrderBy(g => g.PrerequisiteGroups.Count));
+
+        while (p_objQueueOfGroups.Count > 0)
         {
-            if (!objGroup.IsCompleted)
-                StartCalling(p_objListOfGroups, objGroup);
+            Group objCurrentGroup;
+            do
+            {
+                objCurrentGroup = p_objQueueOfGroups.Dequeue();
+            } while (objCurrentGroup.IsCompleted);
+
+            StartCalling(p_objListOfGroups, p_objQueueOfGroups, objCurrentGroup);
         }
     }
 
-    static void StartCalling(List<Group> p_objListOfGroups, Group p_objGroup)
+    static void StartCalling(List<Group> p_objListOfGroups, Queue<Group> p_objQueueOfGroups, Group p_objGroup)
     {
-        for (int i = 0; i < p_objGroup.PrerequisiteGroups.Count; i++)
+        var objPrereqs = p_objListOfGroups.Where(g => !g.IsCompleted).Join(p_objGroup.PrerequisiteGroups, e => new { e.Name, e.Category }, d => new { d.Name, d.Category }, (tbl1, tbl2) => tbl1);
+
+        if (objPrereqs.Count() > 0)
         {
-            var unfinishedGroup = p_objListOfGroups.FirstOrDefault(g => g.Name == p_objGroup.PrerequisiteGroups[i].Name
-                                                                    && g.Category == p_objGroup.PrerequisiteGroups[i].Category
-                                                                    && !g.IsCompleted);
-
-            if (unfinishedGroup != null)
-                StartCalling(p_objListOfGroups, unfinishedGroup);
+            int max = objPrereqs.Max(a => a.RequiredTime);
+            p_objGroup.MinTimeBeforeStart = CurrentTime + max;
+            p_objQueueOfGroups.Enqueue(p_objGroup);
+            foreach (Group group in objPrereqs)
+                StartCalling(p_objListOfGroups, p_objQueueOfGroups, group);
         }
-
-        AssignWorker(p_objGroup);
+        else
+            AssignWorker(p_objGroup);
     }
 
     static void AssignWorker(Group p_objGroup)
     {
-        Worker worker = GetAvailableWorker(p_objGroup.RequiredTime);
+        Worker worker = GetAvailableWorker(p_objGroup);
         worker.TimeSpent += p_objGroup.RequiredTime;
         worker.FinishedGroups.Add(p_objGroup);
 
@@ -143,19 +151,22 @@ class Program
         return workers;
     }
 
-    static Worker GetAvailableWorker(int p_intTimeNeeded)
+    static Worker GetAvailableWorker(Group p_objGroup)
     {
+        if (p_objGroup.MinTimeBeforeStart > CurrentTime)
+            CurrentTime = p_objGroup.MinTimeBeforeStart;
+
         var worker = Workers.FirstOrDefault(w => w.NextAvailableTime <= CurrentTime);
         if (worker != null)
         {
-            worker.NextAvailableTime = CurrentTime + p_intTimeNeeded;
+            worker.NextAvailableTime = CurrentTime + p_objGroup.RequiredTime;
 
             return worker;
         }
 
         worker = Workers.OrderBy(t => t.NextAvailableTime).First();
         CurrentTime = worker.NextAvailableTime;
-        worker.NextAvailableTime = CurrentTime + p_intTimeNeeded;
+        worker.NextAvailableTime = CurrentTime + p_objGroup.RequiredTime;
 
         return worker;
     }
@@ -200,6 +211,7 @@ public class Group : GroupBase
     public int RequiredTime { get; set; }
     public List<GroupBase> PrerequisiteGroups = new List<GroupBase>();
     public bool IsCompleted { get; set; }
+    public int MinTimeBeforeStart { get; set; }
 }
 
 // Class for group of customers
