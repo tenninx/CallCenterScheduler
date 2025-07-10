@@ -33,7 +33,9 @@ class Program
             }
             else
             {
-                var result = Schedule(3, 3, numOfWorkers, parsedInput.GroupOfCustomers);
+                Schedule(numOfWorkers, parsedInput.GroupOfCustomers);
+
+                var result = GenerateResult(numOfTopGroups, numOfTopCategories, parsedInput.GroupOfCustomers);
 
                 Console.WriteLine("Result: " + result);
             }
@@ -95,7 +97,7 @@ class Program
         return objResult;
     }
 
-    static string Schedule(int G, int C, int N, List<Group> p_objListOfGroups)
+    static void Schedule(int N, List<Group> p_objListOfGroups)
     {
         Workers = InitWorkers(N);
 
@@ -104,10 +106,6 @@ class Program
             if (!objGroup.IsCompleted)
                 StartCalling(p_objListOfGroups, objGroup);
         }
-
-        var highestTime = Workers.OrderByDescending(w => w.NextAvailableTime).First();
-
-        return highestTime.NextAvailableTime.ToString();
     }
 
     static void StartCalling(List<Group> p_objListOfGroups, Group p_objGroup)
@@ -130,7 +128,7 @@ class Program
         Worker worker = GetAvailableWorker(p_objGroup.RequiredTime);
         worker.TimeSpent += p_objGroup.RequiredTime;
         worker.FinishedGroups.Add(p_objGroup);
-        
+
         p_objGroup.IsCompleted = true;
     }
 
@@ -160,6 +158,31 @@ class Program
         worker.NextAvailableTime = CurrentTime + p_intTimeNeeded;
 
         return worker;
+    }
+
+    static string GenerateResult(int G, int C, List<Group> p_objListOfGroups)
+    {
+        SortedSet<string> groupNames = new SortedSet<string>();
+        var temp = p_objListOfGroups.OrderByDescending(g => g.RequiredTime).ToList();
+        HashSet<string> categories = new HashSet<string>();
+
+        for (int i = 0; i < temp.Count; i++)
+        {
+            if (groupNames.Count >= G) break;
+            if (!categories.Contains(temp[i].Category) && categories.Count < C)
+                categories.Add(temp[i].Category);
+            else if (!categories.Contains(temp[i].Category) && categories.Count == C)
+                continue;
+            groupNames.Add(temp[i].Name);
+        }
+
+        var highestTime = Workers.OrderByDescending(w => w.NextAvailableTime).First();
+
+        var topGroups = string.Empty;
+        if (groupNames.Count > 0)
+            topGroups = "," + String.Join(",", groupNames);
+
+        return highestTime.NextAvailableTime.ToString() + topGroups;
     }
 }
 
