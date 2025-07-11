@@ -307,6 +307,9 @@ Leave it empty and press enter to terminate. Enter your input:");
         /// <returns>Result in string format</returns>
         public string GenerateResult()
         {
+            if (Global.Workers.Count == 0)
+                return "Error Message: CallCenterScheduler should be started first. Execute Start() method before generating the result.";
+
             SortedSet<string> groupNames = new SortedSet<string>();
             var listOfGroups = Global.ListOfGroups.OrderByDescending(g => g.RequiredTime).ToList();
             HashSet<string> categories = new HashSet<string>();

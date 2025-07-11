@@ -244,5 +244,18 @@ namespace CallCenterSchedulerTests
             // Then
             Assert.AreEqual(result, "115309,OR Other,WA King,WA Other");
         }
+
+        [TestMethod]
+        public void GenerateResultWithoutStart()
+        {
+            // Given
+            CallCenterScheduler scheduler = new CallCenterScheduler();
+
+            // When
+            var result = scheduler.GenerateResult();
+
+            // Then
+            Assert.AreEqual(result, "Error Message: CallCenterScheduler should be started first. Execute Start() method before generating the result.");
+        }
     }
 }
