@@ -18,7 +18,7 @@ You need to specify all G, C and N at once or none by specifying {input_data} di
 Example input with settings: 2,2,0-Home,OR Jefferson,5444;Medicare,OR Lake,1304;Medicare,WA King,43061;Life,OR Other,12806,Medicare,OR Lake;Life,WA Other,70944,Medicare,WA King
 Example input using defaults: Home,OR Jefferson,5444;Medicare,OR Lake,1304;Medicare,WA King,43061;Life,OR Other,12806,Medicare,OR Lake;Life,WA Other,70944,Medicare,WA King
 Leave it empty and press enter to terminate. Enter your input:");
-            
+
             input = Console.ReadLine();
 
             if (string.IsNullOrEmpty(input)) break;
@@ -43,7 +43,7 @@ Leave it empty and press enter to terminate. Enter your input:");
 
             Schedule();
 
-            var result = GenerateResult(WorkingEnvironment.NumOfTopGroups, WorkingEnvironment.NumOfTopCategories);
+            var result = GenerateResult();
 
             Console.WriteLine("Result: " + result);
             Console.WriteLine();
@@ -136,20 +136,22 @@ Leave it empty and press enter to terminate. Enter your input:");
 
     private static QueryResult LinkPrerequisites()
     {
-        foreach (var group in WorkingEnvironment.ListOfGroups)
+        for (int i = 0; i < WorkingEnvironment.ListOfGroups.Count; i++)
         {
-            for (int i = 0; i < group.PrerequisiteGroups.Count; i++)
+            for (int j = 0; j < WorkingEnvironment.ListOfGroups[i].PrerequisiteGroups.Count; j++)
             {
-                var foundGroup = WorkingEnvironment.ListOfGroups.FirstOrDefault(g => g.Name == group.PrerequisiteGroups[i].Name && g.Category == group.PrerequisiteGroups[i].Category);
+                var foundGroup = WorkingEnvironment.ListOfGroups.FirstOrDefault(g => g.Name == WorkingEnvironment.ListOfGroups[i].PrerequisiteGroups[j].Name && g.Category == WorkingEnvironment.ListOfGroups[i].PrerequisiteGroups[j].Category);
 
                 if (foundGroup == null)
-                    return GenerateResult(false, "Prerequisite '" + String.Join(",", group.PrerequisiteGroups[i].Category, group.PrerequisiteGroups[i].Name) + " is not found.");
+                    return GenerateResult(false, "Prerequisite '" + String.Join(",", WorkingEnvironment.ListOfGroups[i].PrerequisiteGroups[j].Category, WorkingEnvironment.ListOfGroups[i].PrerequisiteGroups[j].Name) + " is not found.");
 
                 if (foundGroup.PrerequisiteGroups.Count > 0)
-                    return GenerateResult(false, "Nested prerequisites at '" + String.Join(",", group.Category, group.Name) + "' are not supported.");
+                    return GenerateResult(false, "Nested prerequisites at '" + String.Join(",", WorkingEnvironment.ListOfGroups[i].Category, WorkingEnvironment.ListOfGroups[i].Name) + "' are not supported.");
 
-                group.PrerequisiteGroups[i] = foundGroup;
+                WorkingEnvironment.ListOfGroups[i].PrerequisiteGroups[j] = foundGroup;
             }
+
+            WorkingEnvironment.ListOfGroups[i].PrerequisiteGroups = WorkingEnvironment.ListOfGroups[i].PrerequisiteGroups.OrderByDescending(p => p.RequiredTime).ToList();
         }
 
         return GenerateResult(true);
@@ -250,10 +252,10 @@ Leave it empty and press enter to terminate. Enter your input:");
                 p_objGroup.MinTimeBeforeStart = minTime;
         }
 
-        return GenerateResult(true, null, p_objGroup.PrerequisiteGroups.Where(p => !p.IsCompleted).ToList());
+        return GenerateResult(true, p_objGroup.PrerequisiteGroups.Where(p => !p.IsCompleted).ToList());
     }
 
-    static string GenerateResult(int G, int C)
+    static string GenerateResult()
     {
         SortedSet<string> groupNames = new SortedSet<string>();
         var temp = WorkingEnvironment.ListOfGroups.OrderByDescending(g => g.RequiredTime).ToList();
@@ -261,10 +263,10 @@ Leave it empty and press enter to terminate. Enter your input:");
 
         for (int i = 0; i < temp.Count; i++)
         {
-            if (groupNames.Count >= G) break;
-            if (!categories.Contains(temp[i].Category) && categories.Count < C)
+            if (groupNames.Count >= WorkingEnvironment.NumOfTopGroups) break;
+            if (!categories.Contains(temp[i].Category) && categories.Count < WorkingEnvironment.NumOfTopGroups)
                 categories.Add(temp[i].Category);
-            else if (!categories.Contains(temp[i].Category) && categories.Count == C)
+            else if (!categories.Contains(temp[i].Category) && categories.Count == WorkingEnvironment.NumOfTopCategories)
                 continue;
             groupNames.Add(temp[i].Name);
         }
@@ -278,10 +280,15 @@ Leave it empty and press enter to terminate. Enter your input:");
         return highestTime.NextAvailableTime.ToString() + topGroups;
     }
 
-    #region QueryResult Methods
+    #region QueryResult Generation Methods
     static QueryResult GenerateResult(bool p_isValid)
     {
         return GenerateResult(p_isValid, null, null);
+    }
+
+    static QueryResult GenerateResult(bool p_isValid, object? p_objResult = null)
+    {
+        return GenerateResult(p_isValid, null, p_objResult);
     }
 
     static QueryResult GenerateResult(bool p_isValid, string? p_errorMessage = null)
@@ -306,39 +313,131 @@ Leave it empty and press enter to terminate. Enter your input:");
 /// </summary>
 public static class WorkingEnvironment
 {
+    /// <summary>
+    /// List of workers in the call center. Each worker can handle multiple groups but once calling a group of customers, 
+    /// they cannot be assigned to another group until the current one is completed.
+    /// </summary>
     public static List<Worker> Workers;
-    public static List<Group> FinishedGroups;
+
+    /// <summary>
+    /// List of groups of customers that are available for calling. This is initialized from the input data and contains 
+    /// all groups with their categories, names, required times, and prerequisites.
+    /// </summary>
     public static List<Group> ListOfGroups;
+
+    /// <summary>
+    /// List of groups that have been completed by any workers. This is used to track the progress of the call center 
+    /// operations.
+    /// </summary>
+    public static List<Group> FinishedGroups;
+
+    /// <summary>
+    /// Number of top groups to return in the result. If set to 0, only the completion time is returned.
+    /// </summary>
     public static int NumOfTopGroups = 3;
-    public static int NumOfTopCategories = 1;
+
+    /// <summary>
+    /// Number of top categories for the top groups to return in the result. If set to 0, only the completion time is 
+    /// returned.
+    /// </summary>
+    public static int NumOfTopCategories = 3;
+
+    /// <summary>
+    /// Number of workers in the call center. If set to 0, it means unlimited number of workers can be used.
+    /// </summary>
     public static int NumOfWorkers = 2;
+
+    /// <summary>
+    /// Total time that workers had to wait for prerequisites to be completed before they could start processing their 
+    /// assigned groups. For debugging purpose.
+    /// </summary>
     public static int WaitedTime;
 }
 
+/// <summary>
+/// Worker class representing a worker in the call center.
+/// </summary>
 public class Worker
 {
+    /// <summary>
+    /// Unique identifier for the worker. For debugging purpose.
+    /// </summary>
     public int ID { get; set; }
+
+    /// <summary>
+    /// Group of customers that the worker is currently calling. For debugging purpose.
+    /// </summary>
     public Group? WorkingOn { get; set; }
-    public int TimeSpent { get; set; }
+
+    /// <summary>
+    /// Next available time for the worker to call the next group of customers.
+    /// </summary>
     public int NextAvailableTime { get; set; }
+
+    /// <summary>
+    /// List of groups that the worker has finished processing. For debugging purpose.
+    /// </summary>
     public List<Group> FinishedGroups = new List<Group>();
 }
 
-// Class for group of customers with conditions
+/// <summary>
+/// Group class representing a group of customers for a worker to call.
+/// </summary>
 public class Group
 {
+    /// <summary>
+    /// Category of the group of customers.
+    /// </summary>
     public string Category { get; set; }
+
+    /// <summary>
+    /// Name of the group of customers.
+    /// </summary>
     public string Name { get; set; }
+
+    /// <summary>
+    /// Required time to process this group.
+    /// </summary>
     public int RequiredTime { get; set; }
+
+    /// <summary>
+    /// List of prerequisite groups that must be completed before this group can be processed.
+    /// </summary>
     public List<Group> PrerequisiteGroups = new List<Group>();
+
+    /// <summary>
+    /// Indicates whether the group has been completed by a worker.
+    /// </summary>
     public bool IsCompleted { get; set; }
+
+    /// <summary>
+    /// Minimum time before this group can start processing, based on prerequisites.
+    /// </summary>
     public int MinTimeBeforeStart { get; set; }
+
+    /// <summary>
+    /// Start time of the group processing, set when the worker is assigned to this group.
+    /// </summary>
     public int StartTime { get; set; }
 }
 
+/// <summary>
+/// QueryResult class to encapsulate the result of a query.
+/// </summary>
 public class QueryResult
 {
+    /// <summary>
+    /// Indicates whether the query is successful.
+    /// </summary>
     public bool IsValidInput { get; set; }
+
+    /// <summary>
+    /// Error message if the query is not valid.
+    /// </summary>
     public string? ErrorMessage { get; set; }
+
+    /// <summary>
+    /// Result of the query, can be any object type.
+    /// </summary>
     public object? Result { get; set; }
 }
