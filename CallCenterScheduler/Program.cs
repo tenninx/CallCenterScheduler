@@ -149,7 +149,24 @@ Leave it empty and press enter to terminate. Enter your input:");
 
             Global.ListOfGroups = objGroups;
 
+            var result = CheckDuplicatedEntries();
+            if (result != null)
+                return QueryResultGenerator.Generate(false, "Duplicated entry '" + String.Join(",", result.Category, result.Name) + "' found in the input data. Each group of customers should be unique by its name and category.");
+
             return LinkPrerequisites();
+        }
+
+        /// <summary>
+        /// Check for duplicated entries in the list of groups. Each group should be unique by its name and category.
+        /// </summary>
+        /// <returns>QueryResult</returns>
+        private Group? CheckDuplicatedEntries()
+        {
+            var dupGroup = Global.ListOfGroups.GroupBy(x => new { x.Name, x.Category }).Where(g => g.Count() > 1).FirstOrDefault();
+            if (dupGroup != null)
+                return dupGroup.First();
+
+            return null;
         }
 
         /// <summary>

@@ -102,6 +102,20 @@ namespace CallCenterSchedulerTests
         }
 
         [TestMethod]
+        public void TestParseInput_WithInvalidInput6()
+        {
+            // Given
+            CallCenterScheduler scheduler = new CallCenterScheduler();
+
+            // When
+            var result = scheduler.ParseInput("Home,OR Jefferson,5444;Medicare,OR Lake,1304;Life,OR Other,3456;Medicare,WA King,43061;Life,OR Other,12806,Medicare,OR Lake;Life,WA Other,70944,Medicare,WA King");
+
+            // Then
+            Assert.IsFalse(result.IsValidInput);
+            Assert.AreEqual("Duplicated entry 'Life,OR Other' found in the input data. Each group of customers should be unique by its name and category.", result.ErrorMessage);
+        }
+
+        [TestMethod]
         public void TestParseInput_WithValidSettings()
         {
             // Given
