@@ -93,9 +93,6 @@ class Program
                 PrerequisiteGroups = objPrereqs
             };
 
-            if (HasNestedPrerequisites(objGroup))
-                return new ParsedInput { ErrorMessage = "Nested prerequisites are not supported." };
-
             objGroups.Add(objGroup);
         }
 
@@ -107,17 +104,6 @@ class Program
         ListOfGroups = objGroups;
 
         return objResult;
-    }
-
-    private static bool HasNestedPrerequisites(Group objGroup)
-    {
-        foreach (var group in objGroup.PrerequisiteGroups)
-        {
-            if (group.PrerequisiteGroups.Count > 0)
-                return true;
-        }
-
-        return false;
     }
 
     static void Schedule()
@@ -292,7 +278,6 @@ public class Group
     public bool IsCompleted { get; set; }
     public int MinTimeBeforeStart { get; set; }
     public int StartTime { get; set; }
-    //public int FinishedTime { get; set; }
 }
 
 public class ParsedInput
