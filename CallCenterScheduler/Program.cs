@@ -54,27 +54,6 @@ class Program
         }
     }
 
-    private static QueryResult LinkPrerequisites()
-    {
-        foreach (var group in ListOfGroups)
-        {
-            for (int i = 0; i < group.PrerequisiteGroups.Count; i++)
-            {
-                var foundGroup = ListOfGroups.FirstOrDefault(g => g.Name == group.PrerequisiteGroups[i].Name && g.Category == group.PrerequisiteGroups[i].Category);
-
-                if (foundGroup == null)
-                    return GenerateResult(false, "Prerequisite '" + String.Join(',', group.PrerequisiteGroups[i].Category, group.PrerequisiteGroups[i].Name) + " is not found.");
-
-                if (foundGroup.PrerequisiteGroups.Count > 0)
-                    return GenerateResult(false, "Nested prerequisites at " + String.Join(',', group.Category, group.Name) + " are not supported.");
-
-                group.PrerequisiteGroups[i] = foundGroup;
-            }
-        }
-
-        return GenerateResult(true);
-    }
-
     /// <summary>
     /// Parse text input from console into data objects
     /// </summary>
@@ -95,10 +74,10 @@ class Program
                 return GenerateResult(false, "Invalid group of customers input at '" + strGroup + "'.");
 
             if (!int.TryParse(strGroupDetails[2], out int time))
-                return GenerateResult(false, "Invalid required time input at '" + String.Join(',', strGroupDetails[0], strGroupDetails[1]) + "'.");
+                return GenerateResult(false, "Invalid required time input at '" + String.Join(",", strGroupDetails[0], strGroupDetails[1]) + "'.");
 
             if (strGroupDetails.Length > 3 && (strGroupDetails.Length - 3) % 2 != 0)
-                return GenerateResult(false, "Invalid prerequisites input at '" + String.Join(',', strGroupDetails[0], strGroupDetails[1]) + "'.");
+                return GenerateResult(false, "Invalid prerequisites input at '" + String.Join(",", strGroupDetails[0], strGroupDetails[1]) + "'.");
             else if (strGroupDetails.Length > 3)
             {
                 for (int i = 3; i < strGroupDetails.Length; i++)
@@ -127,24 +106,25 @@ class Program
         return GenerateResult(true, null, objGroups);
     }
 
-    static QueryResult GenerateResult(bool p_isValid)
+    private static QueryResult LinkPrerequisites()
     {
-        return GenerateResult(p_isValid, null, null);
-    }
-
-    static QueryResult GenerateResult(bool p_isValid, string? p_errorMessage = null)
-    {
-        return GenerateResult(p_isValid, p_errorMessage, null);
-    }
-
-    static QueryResult GenerateResult(bool p_isValid, string? p_errorMessage = null, object? p_result = null)
-    {
-        return new QueryResult
+        foreach (var group in ListOfGroups)
         {
-            IsValidInput = p_isValid,
-            ErrorMessage = p_errorMessage,
-            Result = p_result
-        };
+            for (int i = 0; i < group.PrerequisiteGroups.Count; i++)
+            {
+                var foundGroup = ListOfGroups.FirstOrDefault(g => g.Name == group.PrerequisiteGroups[i].Name && g.Category == group.PrerequisiteGroups[i].Category);
+
+                if (foundGroup == null)
+                    return GenerateResult(false, "Prerequisite '" + String.Join(",", group.PrerequisiteGroups[i].Category, group.PrerequisiteGroups[i].Name) + " is not found.");
+
+                if (foundGroup.PrerequisiteGroups.Count > 0)
+                    return GenerateResult(false, "Nested prerequisites at " + String.Join(",", group.Category, group.Name) + " are not supported.");
+
+                group.PrerequisiteGroups[i] = foundGroup;
+            }
+        }
+
+        return GenerateResult(true);
     }
 
     static void Schedule()
@@ -161,54 +141,6 @@ class Program
 
             AssignWorker(worker, group);
         }
-    }
-
-    private static Group? GetNextGroup(Queue<Group> p_objQueueOfGroups, Worker p_objWorker)
-    {
-        while (p_objQueueOfGroups.Count > 0)
-        {
-            Group objCurrentGroup = p_objQueueOfGroups.Dequeue();
-            if (objCurrentGroup.IsCompleted)
-                continue;
-
-            if (objCurrentGroup.PrerequisiteGroups.Count > 0)
-            {
-                var result = GetPrerequisiteGroups(objCurrentGroup, p_objWorker);
-
-                if (!result.IsValidInput)
-                {
-                    Console.WriteLine("Error Message: " + result.ErrorMessage);
-                    return null;
-                }
-
-                if (((List<Group>)result.Result).Count > 0)
-                {
-                    p_objQueueOfGroups.Enqueue(objCurrentGroup);
-                    return ((List<Group>)result.Result).First();
-                }
-            }
-
-            return objCurrentGroup;
-        }
-
-        return null;
-    }
-
-    private static QueryResult GetPrerequisiteGroups(Group p_objGroup, Worker p_objWorker)
-    {
-        var objPrereqs = ListOfGroups.Join(p_objGroup.PrerequisiteGroups, e => new { e.Name, e.Category }, d => new { d.Name, d.Category }, (tbl1, tbl2) => tbl1).OrderByDescending(j => j.RequiredTime).ToList();
-
-        var finishedGroup = FinishedGroups.Find(x => x == objPrereqs.First());
-        if (finishedGroup != null)
-            p_objGroup.MinTimeBeforeStart = finishedGroup.StartTime + finishedGroup.RequiredTime;
-        else
-        {
-            int minTime = p_objWorker.NextAvailableTime + objPrereqs.First().RequiredTime;
-            if (p_objGroup.MinTimeBeforeStart < minTime)
-                p_objGroup.MinTimeBeforeStart = minTime;
-        }
-
-        return GenerateResult(true, null, objPrereqs.Where(p => !p.IsCompleted).ToList());
     }
 
     static Worker GetWorker()
@@ -247,6 +179,52 @@ class Program
         FinishedGroups.Add(p_objGroup);
     }
 
+    private static Group? GetNextGroup(Queue<Group> p_objQueueOfGroups, Worker p_objWorker)
+    {
+        while (p_objQueueOfGroups.Count > 0)
+        {
+            Group objCurrentGroup = p_objQueueOfGroups.Dequeue();
+            if (objCurrentGroup.IsCompleted)
+                continue;
+
+            if (objCurrentGroup.PrerequisiteGroups.Count > 0)
+            {
+                var result = GetPrerequisiteGroups(objCurrentGroup, p_objWorker);
+
+                if (!result.IsValidInput)
+                {
+                    Console.WriteLine("Error Message: " + result.ErrorMessage);
+                    return null;
+                }
+
+                if (((List<Group>)result.Result).Count > 0)
+                {
+                    p_objQueueOfGroups.Enqueue(objCurrentGroup);
+                    return ((List<Group>)result.Result).First();
+                }
+            }
+
+            return objCurrentGroup;
+        }
+
+        return null;
+    }
+
+    private static QueryResult GetPrerequisiteGroups(Group p_objGroup, Worker p_objWorker)
+    {
+        var finishedGroup = FinishedGroups.Find(x => x == p_objGroup.PrerequisiteGroups.First());
+        if (finishedGroup != null)
+            p_objGroup.MinTimeBeforeStart = finishedGroup.StartTime + finishedGroup.RequiredTime;
+        else
+        {
+            int minTime = p_objWorker.NextAvailableTime + p_objGroup.PrerequisiteGroups.First().RequiredTime;
+            if (p_objGroup.MinTimeBeforeStart < minTime)
+                p_objGroup.MinTimeBeforeStart = minTime;
+        }
+
+        return GenerateResult(true, null, p_objGroup.PrerequisiteGroups.Where(p => !p.IsCompleted).ToList());
+    }
+
     static string GenerateResult(int G, int C)
     {
         SortedSet<string> groupNames = new SortedSet<string>();
@@ -271,6 +249,28 @@ class Program
 
         return highestTime.NextAvailableTime.ToString() + topGroups;
     }
+
+    #region QueryResult Methods
+    static QueryResult GenerateResult(bool p_isValid)
+    {
+        return GenerateResult(p_isValid, null, null);
+    }
+
+    static QueryResult GenerateResult(bool p_isValid, string? p_errorMessage = null)
+    {
+        return GenerateResult(p_isValid, p_errorMessage, null);
+    }
+
+    static QueryResult GenerateResult(bool p_isValid, string? p_errorMessage = null, object? p_result = null)
+    {
+        return new QueryResult
+        {
+            IsValidInput = p_isValid,
+            ErrorMessage = p_errorMessage,
+            Result = p_result
+        };
+    }
+    #endregion
 }
 
 public class Worker
