@@ -258,17 +258,17 @@ Leave it empty and press enter to terminate. Enter your input:");
     static string GenerateResult()
     {
         SortedSet<string> groupNames = new SortedSet<string>();
-        var temp = WorkingEnvironment.ListOfGroups.OrderByDescending(g => g.RequiredTime).ToList();
+        var listOfGroups = WorkingEnvironment.ListOfGroups.OrderByDescending(g => g.RequiredTime).ToList();
         HashSet<string> categories = new HashSet<string>();
 
-        for (int i = 0; i < temp.Count; i++)
+        for (int i = 0; i < listOfGroups.Count; i++)
         {
             if (groupNames.Count >= WorkingEnvironment.NumOfTopGroups) break;
-            if (!categories.Contains(temp[i].Category) && categories.Count < WorkingEnvironment.NumOfTopGroups)
-                categories.Add(temp[i].Category);
-            else if (!categories.Contains(temp[i].Category) && categories.Count == WorkingEnvironment.NumOfTopCategories)
+            if (!categories.Contains(listOfGroups[i].Category) && categories.Count < WorkingEnvironment.NumOfTopCategories)
+                categories.Add(listOfGroups[i].Category);
+            else if (!categories.Contains(listOfGroups[i].Category) && categories.Count == WorkingEnvironment.NumOfTopCategories)
                 continue;
-            groupNames.Add(temp[i].Name);
+            groupNames.Add(listOfGroups[i].Name);
         }
 
         var highestTime = WorkingEnvironment.Workers.OrderByDescending(w => w.NextAvailableTime).First();
