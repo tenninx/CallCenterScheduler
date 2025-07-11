@@ -4,6 +4,9 @@ using System.Linq;
 
 class Program
 {
+    /// <summary>
+    /// Main method to start the call center scheduler application.
+    /// </summary>
     public static void Main()
     {
         string? input;
@@ -50,6 +53,9 @@ Leave it empty and press enter to terminate. Enter your input:");
         }
     }
 
+    /// <summary>
+    /// Initialize the working environment by resetting all static properties to their default values.
+    /// </summary>
     static void Init()
     {
         WorkingEnvironment.Workers = new List<Worker>();
@@ -58,17 +64,17 @@ Leave it empty and press enter to terminate. Enter your input:");
     }
 
     /// <summary>
-    /// Parse text input from console into data objects
+    /// Parse the input string to extract settings and groups of customers.
     /// </summary>
     /// <param name="p_strInput">Text input from console</param>
-    /// <returns>Parsed data object</returns>
+    /// <returns>QueryResult</returns>
     static QueryResult ParseInput(string p_strInput)
     {
         p_strInput = p_strInput.Replace("\\,", ",").Replace("\\;", ";").Trim();
 
         if (p_strInput.Contains("-"))
         {
-            string[] settings = p_strInput.Substring(0, p_strInput.IndexOf("-")).Split(",");
+            string[] settings = p_strInput.Substring(0, p_strInput.IndexOf("-")).Split(',');
             if (settings.Length != 3)
                 return GenerateResult(false, "Invalid settings input. Expected format: G,C,N. Either specify all or none for using defaults.");
 
@@ -89,7 +95,7 @@ Leave it empty and press enter to terminate. Enter your input:");
 
         p_strInput = p_strInput.Substring(p_strInput.IndexOf("-") + 1).Trim();
 
-        string[] strGroups = p_strInput.Split(";");
+        string[] strGroups = p_strInput.Split(';');
 
         List<Group> objGroups = new List<Group>();
 
@@ -134,6 +140,10 @@ Leave it empty and press enter to terminate. Enter your input:");
         return GenerateResult(true);
     }
 
+    /// <summary>
+    /// Link prerequisites of each group to the actual group objects in the list.
+    /// </summary>
+    /// <returns>QueryResult</returns>
     private static QueryResult LinkPrerequisites()
     {
         for (int i = 0; i < WorkingEnvironment.ListOfGroups.Count; i++)
@@ -157,6 +167,9 @@ Leave it empty and press enter to terminate. Enter your input:");
         return GenerateResult(true);
     }
 
+    /// <summary>
+    /// Start scheduling the groups of customers to workers based on their prerequisites and required time.
+    /// </summary>
     static void Schedule()
     {
         Queue<Group> p_objQueueOfGroups = new Queue<Group>(WorkingEnvironment.ListOfGroups.OrderBy(l => l.PrerequisiteGroups.Count));
@@ -173,6 +186,10 @@ Leave it empty and press enter to terminate. Enter your input:");
         }
     }
 
+    /// <summary>
+    /// Get an available worker from the pool of workers with its total number specified in the settings.
+    /// </summary>
+    /// <returns>Worker</returns>
     static Worker GetWorker()
     {
         Worker worker;
@@ -191,6 +208,11 @@ Leave it empty and press enter to terminate. Enter your input:");
         return worker;
     }
 
+    /// <summary>
+    /// Assign a worker to a group of customers, updating the worker's next available time and the group's start time.
+    /// </summary>
+    /// <param name="p_objWorker">An assigned worker</param>
+    /// <param name="p_objGroup">An assigned group of customers</param>
     private static void AssignWorker(Worker p_objWorker, Group p_objGroup)
     {
         p_objWorker.WorkingOn = p_objGroup;
@@ -209,6 +231,12 @@ Leave it empty and press enter to terminate. Enter your input:");
         WorkingEnvironment.FinishedGroups.Add(p_objGroup);
     }
 
+    /// <summary>
+    /// Get the next group of customers from the queue, checking if it has prerequisites that need to be completed first.
+    /// </summary>
+    /// <param name="p_objQueueOfGroups">Queue of groups of customers</param>
+    /// <param name="p_objWorker">An assigned worker</param>
+    /// <returns>Group of customers</returns>
     private static Group? GetNextGroup(Queue<Group> p_objQueueOfGroups, Worker p_objWorker)
     {
         while (p_objQueueOfGroups.Count > 0)
@@ -240,6 +268,12 @@ Leave it empty and press enter to terminate. Enter your input:");
         return null;
     }
 
+    /// <summary>
+    /// Get the prerequisite groups for a given group, checking if they have been completed or if the worker can start them based on their next available time.
+    /// </summary>
+    /// <param name="p_objGroup">Group of customers to check prerequisites</param>
+    /// <param name="p_objWorker">An assigned worker</param>
+    /// <returns>QueryResult</returns>
     private static QueryResult GetPrerequisiteGroups(Group p_objGroup, Worker p_objWorker)
     {
         var finishedGroup = WorkingEnvironment.FinishedGroups.Find(x => x == p_objGroup.PrerequisiteGroups.First());
@@ -255,6 +289,10 @@ Leave it empty and press enter to terminate. Enter your input:");
         return GenerateResult(true, p_objGroup.PrerequisiteGroups.Where(p => !p.IsCompleted).ToList());
     }
 
+    /// <summary>
+    /// Generate the final result string based on the completion time of the final group and the top groups/categories specified in the settings.
+    /// </summary>
+    /// <returns>Result in string format</returns>
     static string GenerateResult()
     {
         SortedSet<string> groupNames = new SortedSet<string>();
@@ -296,6 +334,13 @@ Leave it empty and press enter to terminate. Enter your input:");
         return GenerateResult(p_isValid, p_errorMessage, null);
     }
 
+    /// <summary>
+    /// Generate a QueryResult object with the specified parameters.
+    /// </summary>
+    /// <param name="p_isValid">A flag to determine if the query was valid</param>
+    /// <param name="p_errorMessage">A error message to return</param>
+    /// <param name="p_result">An object, if any, resulted from the query</param>
+    /// <returns>QueryResult</returns>
     static QueryResult GenerateResult(bool p_isValid, string? p_errorMessage = null, object? p_result = null)
     {
         return new QueryResult
