@@ -4,8 +4,11 @@ using System.Linq;
 
 class Program
 {
-    static int CurrentTime;
-    static Worker[] Workers;
+    static List<Worker> Workers;
+    static List<Group> FinishedGroups;
+    static List<Group> ListOfGroups;
+    static int NumOfWorkers;
+    static int WaitedTime;
 
     public static void Main()
     {
@@ -14,12 +17,11 @@ class Program
         // C
         int numOfTopCategories = 2;
         // N
-        int numOfWorkers = 3;
+        NumOfWorkers = 3;
 
         string? input;
         while (true)
         {
-            CurrentTime = 0;
             Console.WriteLine("Enter the input in the following format: A string of semicolon-separated data in the form \"category,group,time\" followed by zero or more prerequisites of the form \",category,group\", empty input to terminate:");
             input = Console.ReadLine();
 
@@ -33,9 +35,12 @@ class Program
             }
             else
             {
-                Schedule(parsedInput.GroupOfCustomers, numOfWorkers);
+                Workers = new List<Worker>();
+                FinishedGroups = new List<Group>();
 
-                var result = GenerateResult(numOfTopGroups, numOfTopCategories, parsedInput.GroupOfCustomers);
+                Schedule();
+
+                var result = GenerateResult(numOfTopGroups, numOfTopCategories);
 
                 Console.WriteLine("Result: " + result);
             }
@@ -88,166 +93,151 @@ class Program
                 PrerequisiteGroups = objPrereqs
             };
 
+            if (HasNestedPrerequisites(objGroup))
+                return new ParsedInput { ErrorMessage = "Nested prerequisites are not supported." };
+
             objGroups.Add(objGroup);
         }
 
         // Check circular recursive
-        var result = objGroups.SelectManyRecursive(l => l.PrerequisiteGroups).Select(l => l.Name).ToList();
+        //var result = objGroups.SelectManyRecursive(l => l.PrerequisiteGroups).Select(l => l.Name).ToList();
 
         objResult.IsValidInput = true;
-        objResult.GroupOfCustomers = objGroups;
+
+        ListOfGroups = objGroups;
 
         return objResult;
     }
 
-    static void Schedule(List<Group> p_objListOfGroups, int N)
+    private static bool HasNestedPrerequisites(Group objGroup)
     {
-        Workers = InitWorkers(N);
+        foreach (var group in objGroup.PrerequisiteGroups)
+        {
+            if (group.PrerequisiteGroups.Count > 0)
+                return true;
+        }
 
-        Queue<Group> p_objQueueOfGroups = new Queue<Group>(p_objListOfGroups);
-        //Queue<Group> p_objQueueOfGroups = new Queue<Group>(p_objListOfGroups.OrderBy(g => g.PrerequisiteGroups.Count));
+        return false;
+    }
 
+    static void Schedule()
+    {
+        Queue<Group> p_objQueueOfGroups = new Queue<Group>(ListOfGroups.OrderBy(l => l.PrerequisiteGroups.Count));
+
+        while (true)
+        {
+            var worker = GetWorker();
+
+            var group = GetNextGroup(p_objQueueOfGroups, worker);
+            if (group == null)
+                break;
+
+            AssignWorker(worker, group);
+        }
+    }
+
+    private static Group? GetNextGroup(Queue<Group> p_objQueueOfGroups, Worker p_objWorker)
+    {
         while (p_objQueueOfGroups.Count > 0)
         {
-            Group objCurrentGroup;
-            do
+            Group objCurrentGroup = p_objQueueOfGroups.Dequeue();
+            if (objCurrentGroup.IsCompleted)
+                continue;
+
+            if (objCurrentGroup.PrerequisiteGroups.Count > 0)
             {
-                objCurrentGroup = p_objQueueOfGroups.Dequeue();
-            } while (objCurrentGroup.IsCompleted);
+                var result = GetPrerequisiteGroups(objCurrentGroup, p_objWorker);
 
-            //int maxPrereqTime = 0;
-            //GetWaitingTime(p_objListOfGroups, p_objQueueOfGroups, objCurrentGroup, ref maxPrereqTime);
-            //objCurrentGroup.MinTimeBeforeStart = maxPrereqTime;
+                if (!result.IsValidInput)
+                {
+                    Console.WriteLine("Error Message: " + result.ErrorMessage);
+                    return null;
+                }
 
-            StartCalling(p_objListOfGroups, p_objQueueOfGroups, objCurrentGroup);
-            //objCurrentGroup.MinTimeBeforeStart = minStartTime;
+                if (result.GroupOfCustomers.Count > 0)
+                {
+                    p_objQueueOfGroups.Enqueue(objCurrentGroup);
+                    return result.GroupOfCustomers.First();
+                }
+            }
+
+            return objCurrentGroup;
         }
+
+        return null;
     }
 
-    private static void GetWaitingTime(List<Group> p_objListOfGroups, Queue<Group> p_objQueueOfGroups, Group p_objCurrentGroup, ref int p_intTime)
+    private static ParsedInput GetPrerequisiteGroups(Group p_objGroup, Worker p_objWorker)
     {
-        var objPrereqs = p_objListOfGroups.OrderByDescending(a => a.RequiredTime).Join(p_objCurrentGroup.PrerequisiteGroups, e => new { e.Name, e.Category }, d => new { d.Name, d.Category }, (tbl1, tbl2) => tbl1);
+        ParsedInput result = new ParsedInput();
 
-        if (objPrereqs.Count() > 0)
+        var objPrereqs = ListOfGroups.Join(p_objGroup.PrerequisiteGroups, e => new { e.Name, e.Category }, d => new { d.Name, d.Category }, (tbl1, tbl2) => tbl1).OrderByDescending(j => j.RequiredTime).ToList();
+
+        // No nested prerequisites
+        if (objPrereqs.Where(p => p.PrerequisiteGroups.Count > 0).Count() > 0)
         {
-            p_intTime += objPrereqs.First().RequiredTime;
-
-            GetWaitingTime(p_objListOfGroups, p_objQueueOfGroups, objPrereqs.First(), ref p_intTime);
+            result.ErrorMessage = "Nested prerequisites are not supported.";
+            return result;
         }
-    }
 
-    static void StartCalling(List<Group> p_objListOfGroups, Queue<Group> p_objQueueOfGroups, Group p_objGroup)
-    {
-        if (p_objGroup.MinTimeBeforeStart == 0)
+        var finishedGroup = FinishedGroups.Find(x => x == objPrereqs.First());
+        if (finishedGroup != null)
         {
-            int maxPrereqTime = 0;
-            GetWaitingTime(p_objListOfGroups, p_objQueueOfGroups, p_objGroup, ref maxPrereqTime);
-            Worker a = GetAvailableWorker(p_objGroup);
-            p_objGroup.MinTimeBeforeStart = maxPrereqTime;
-        }
-        //else
-        //    p_objGroup.MinTimeBeforeStart += CurrentTime - PreviousTime;
-
-        var objPrereqs = p_objListOfGroups.Where(g => !g.IsCompleted).OrderByDescending(a => a.RequiredTime).Join(p_objGroup.PrerequisiteGroups, e => new { e.Name, e.Category }, d => new { d.Name, d.Category }, (tbl1, tbl2) => tbl1);
-
-        if (objPrereqs.Count() > 0)
-        {
-            //p_intMaxPrereqTime += objPrereqs.First().RequiredTime;
-            //p_objGroup.MinTimeBeforeStart += objPrereqs.First().RequiredTime;
-            p_objQueueOfGroups.Enqueue(p_objGroup);
-            StartCalling(p_objListOfGroups, p_objQueueOfGroups, objPrereqs.First());
-
-            //p_intMaxPrereqTime += maxRequiredTime;
-            //p_objGroup.MinTimeBeforeStart = CurrentTime + p_intMaxPrereqTime;
-            //p_objGroup.MinTimeBeforeStart = CurrentTime + p_intMaxPrereqTime;
-
-            //foreach (Group group in objPrereqs)
-            //{
-            //    // return prerequistes wait time
-            //    StartCalling(p_objListOfGroups, p_objQueueOfGroups, group, ref p_intMaxPrereqTime);
-            //    //group.MinTimeBeforeStart = CurrentTime + p_intMaxPrereqTime;
-            //}
-
-            //if (p_objGroup.MinTimeBeforeStart < p_intMaxPrereqTime)
-            //    p_objGroup.MinTimeBeforeStart = p_intMaxPrereqTime;
-            //return p_intMaxPrereqTime;
+            p_objGroup.MinTimeBeforeStart = finishedGroup.StartTime + finishedGroup.RequiredTime;
         }
         else
-            AssignWorker(p_objGroup);
-
-        //return 0;
-    }
-
-    //static int StartCalling(List<Group> p_objListOfGroups, Queue<Group> p_objQueueOfGroups, Group p_objGroup, ref int p_intMaxPrereqTime)
-    //{
-    //    var objPrereqs = p_objListOfGroups.Where(g => !g.IsCompleted).Join(p_objGroup.PrerequisiteGroups, e => new { e.Name, e.Category }, d => new { d.Name, d.Category }, (tbl1, tbl2) => tbl1);
-
-    //    if (objPrereqs.Count() > 0)
-    //    {
-    //        var maxRequiredTime = objPrereqs.Max(a => a.RequiredTime);
-    //        p_intMaxPrereqTime += maxRequiredTime;
-    //        p_objGroup.MinTimeBeforeStart = CurrentTime + p_intMaxPrereqTime;
-    //        //p_objGroup.MinTimeBeforeStart = CurrentTime + p_intMaxPrereqTime;
-    //        p_objQueueOfGroups.Enqueue(p_objGroup);
-    //        foreach (Group group in objPrereqs)
-    //        {
-    //            // return prerequistes wait time
-    //            StartCalling(p_objListOfGroups, p_objQueueOfGroups, group, ref p_intMaxPrereqTime);
-    //            //group.MinTimeBeforeStart = CurrentTime + p_intMaxPrereqTime;
-    //        }
-
-    //        return p_intMaxPrereqTime;
-    //    }
-    //    else
-    //        AssignWorker(p_objGroup);
-
-    //    return 0;
-    //}
-
-    static void AssignWorker(Group p_objGroup)
-    {
-        Worker worker = GetAvailableWorker(p_objGroup);
-        worker.TimeSpent += p_objGroup.RequiredTime;
-        worker.FinishedGroups.Add(p_objGroup);
-
-        p_objGroup.IsCompleted = true;
-    }
-
-    static Worker[] InitWorkers(int p_intNumber)
-    {
-        Worker[] workers = new Worker[p_intNumber];
-        for (int i = 0; i < p_intNumber; i++)
         {
-            workers[i] = new Worker();
-            workers[i].ID = i;
-        }
-        return workers;
-    }
-
-    static Worker GetAvailableWorker(Group p_objGroup)
-    {
-        if (p_objGroup.MinTimeBeforeStart > CurrentTime)
-            CurrentTime = p_objGroup.MinTimeBeforeStart;
-
-        var worker = Workers.OrderBy(w => w.NextAvailableTime).FirstOrDefault(w => w.NextAvailableTime <= CurrentTime);
-        if (worker != null)
-        {
-            worker.NextAvailableTime = CurrentTime + p_objGroup.RequiredTime;
-
-            return worker;
+            int minTime = p_objWorker.NextAvailableTime + objPrereqs.First().RequiredTime;
+            if (p_objGroup.MinTimeBeforeStart < minTime)
+                p_objGroup.MinTimeBeforeStart = minTime;
         }
 
-        worker = Workers.OrderBy(t => t.NextAvailableTime).First();
-        CurrentTime = worker.NextAvailableTime;
-        worker.NextAvailableTime = CurrentTime + p_objGroup.RequiredTime;
+        result.IsValidInput = true;
+        result.GroupOfCustomers = objPrereqs.Where(p => !p.IsCompleted).ToList();
+
+        return result;
+    }
+
+    static Worker GetWorker()
+    {
+        Worker worker;
+
+        if (Workers.Count < NumOfWorkers)
+        {
+            worker = new Worker() { ID = Workers.Count };
+            Workers.Add(worker);
+        }
+        else
+        {
+            worker = Workers.OrderBy(w => w.NextAvailableTime).Take(1).First();
+            worker.WorkingOn = null;
+        }
 
         return worker;
     }
 
-    static string GenerateResult(int G, int C, List<Group> p_objListOfGroups)
+    private static void AssignWorker(Worker p_objWorker, Group p_objGroup)
+    {
+        p_objWorker.WorkingOn = p_objGroup;
+
+        if (p_objWorker.NextAvailableTime < p_objGroup.MinTimeBeforeStart)
+        {
+            WaitedTime += p_objGroup.MinTimeBeforeStart - p_objWorker.NextAvailableTime;
+            p_objWorker.NextAvailableTime = p_objGroup.MinTimeBeforeStart;
+        }
+
+        p_objGroup.StartTime = p_objWorker.NextAvailableTime;
+        p_objWorker.NextAvailableTime += p_objGroup.RequiredTime;
+
+        p_objGroup.IsCompleted = true;
+        FinishedGroups.Add(p_objGroup);
+        // Add finish time
+    }
+
+    static string GenerateResult(int G, int C)
     {
         SortedSet<string> groupNames = new SortedSet<string>();
-        var temp = p_objListOfGroups.OrderByDescending(g => g.RequiredTime).ToList();
+        var temp = ListOfGroups.OrderByDescending(g => g.RequiredTime).ToList();
         HashSet<string> categories = new HashSet<string>();
 
         for (int i = 0; i < temp.Count; i++)
@@ -286,6 +276,7 @@ public static class Extensions
 public class Worker
 {
     public int ID { get; set; }
+    public Group? WorkingOn { get; set; }
     public int TimeSpent { get; set; }
     public int NextAvailableTime { get; set; }
     public List<Group> FinishedGroups = new List<Group>();
@@ -300,6 +291,8 @@ public class Group
     public List<Group> PrerequisiteGroups = new List<Group>();
     public bool IsCompleted { get; set; }
     public int MinTimeBeforeStart { get; set; }
+    public int StartTime { get; set; }
+    //public int FinishedTime { get; set; }
 }
 
 public class ParsedInput
