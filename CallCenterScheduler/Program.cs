@@ -119,7 +119,7 @@ Leave it empty and press enter to terminate. Enter your input:");
                 if (strGroupDetails.Length < 3)
                     return QueryResultGenerator.Generate(false, "Invalid group of customers input at '" + strGroup + "'.");
 
-                if (!int.TryParse(strGroupDetails[2], out int time))
+                if (!double.TryParse(strGroupDetails[2], out double time) && time < 0)
                     return QueryResultGenerator.Generate(false, "Invalid required time input at '" + String.Join(",", strGroupDetails[0], strGroupDetails[1]) + "'.");
 
                 if (strGroupDetails.Length > 3 && (strGroupDetails.Length - 3) % 2 != 0)
@@ -310,7 +310,7 @@ Leave it empty and press enter to terminate. Enter your input:");
                 p_objGroup.MinTimeBeforeStart = finishedGroup.StartTime + finishedGroup.RequiredTime;
             else
             {
-                int minTime = p_objWorker.NextAvailableTime + p_objGroup.PrerequisiteGroups.First().RequiredTime;
+                double minTime = p_objWorker.NextAvailableTime + p_objGroup.PrerequisiteGroups.First().RequiredTime;
                 if (p_objGroup.MinTimeBeforeStart < minTime)
                     p_objGroup.MinTimeBeforeStart = minTime;
             }
@@ -341,13 +341,26 @@ Leave it empty and press enter to terminate. Enter your input:");
                 groupNames.Add(listOfGroups[i].Name);
             }
 
-            var highestTime = Global.Workers.OrderByDescending(w => w.NextAvailableTime).First();
+            var highestTime = Global.Workers.Max(obj => obj.NextAvailableTime);
+            var highestGroups = Global.Workers.Where(obj => obj.NextAvailableTime == highestTime);
+
+            string highestGroup;
+
+            if (highestGroups.Count() > 1)
+                return "ERROR - tie (group)";
+
+            highestGroup = GetTimeString(highestGroups.First().NextAvailableTime);
 
             var topGroups = string.Empty;
             if (groupNames.Count > 0)
                 topGroups = "," + String.Join(",", groupNames);
 
-            return highestTime.NextAvailableTime.ToString() + topGroups;
+            return highestGroup + topGroups;
+        }
+
+        private string GetTimeString(double p_dblTime)
+        {
+            return p_dblTime.ToString("0.######");
         }
 
         /// <summary>
@@ -393,7 +406,7 @@ Leave it empty and press enter to terminate. Enter your input:");
             /// Total time that workers had to wait for prerequisites to be completed before they could start processing their 
             /// assigned groups. For debugging purpose.
             /// </summary>
-            public int WaitedTime;
+            public double WaitedTime;
         }
     }
 
@@ -453,7 +466,7 @@ Leave it empty and press enter to terminate. Enter your input:");
         /// <summary>
         /// Next available time for the worker to call the next group of customers.
         /// </summary>
-        public int NextAvailableTime { get; set; }
+        public double NextAvailableTime { get; set; }
 
         /// <summary>
         /// List of groups that the worker has finished processing. For debugging purpose.
@@ -479,7 +492,7 @@ Leave it empty and press enter to terminate. Enter your input:");
         /// <summary>
         /// Required time to process this group.
         /// </summary>
-        public int RequiredTime { get; set; }
+        public double RequiredTime { get; set; }
 
         /// <summary>
         /// List of prerequisite groups that must be completed before this group can be processed.
@@ -494,12 +507,12 @@ Leave it empty and press enter to terminate. Enter your input:");
         /// <summary>
         /// Minimum time before this group can start processing, based on prerequisites.
         /// </summary>
-        public int MinTimeBeforeStart { get; set; }
+        public double MinTimeBeforeStart { get; set; }
 
         /// <summary>
         /// Start time of the group processing, set when the worker is assigned to this group.
         /// </summary>
-        public int StartTime { get; set; }
+        public double StartTime { get; set; }
     }
 
     /// <summary>
