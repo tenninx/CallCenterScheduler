@@ -376,16 +376,18 @@ Leave it empty and press enter to terminate. Enter your input:");
 
             string highestGroup;
 
-            if (highestGroups.Count() > 1)
-                return "ERROR - tie (group)";
+            if (highestGroups.Count() == 1 || (highestGroups.Count() > 1 && (Global.NumOfTopGroups == 0 || Global.NumOfTopCategories == 0)))
+            {
+                highestGroup = GetTimeString(highestGroups.First().NextAvailableTime);
 
-            highestGroup = GetTimeString(highestGroups.First().NextAvailableTime);
+                var topGroups = string.Empty;
+                if (groupNames.Count > 0)
+                    topGroups = "," + String.Join(",", groupNames);
 
-            var topGroups = string.Empty;
-            if (groupNames.Count > 0)
-                topGroups = "," + String.Join(",", groupNames);
+                return highestGroup + topGroups;
+            }
 
-            return highestGroup + topGroups;
+            return "ERROR - tie (group)";
         }
 
         private string GetTimeString(double p_dblTime)
