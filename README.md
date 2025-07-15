@@ -49,8 +49,8 @@ The description is pretty clear. One important note to stress: the settings **{G
 
 Some conditions and assumptions are in place to ensure that the application runs seamlessly. They are as follows:
 
-- Multiple groups of prerequisites are allowed but they cannot be nested
-	- For example: **V** can have prerequisites **X**, **Y** and **Z**. However, in this case, all **X**, **Y** and **Z** cannot have any prerequisites. This is to reduce complexity of the algorithm which may need much more time to design. This is also vital to prevent a **deadlock** when **M** refers to **N** and **N** refers back to **M** in their prerequisites. A way to deal with this is to have a pre-schedule tracing algorithm to find out the paths of all workers first before the actual scheduling algorithm takes place.
+- Multiple groups of prerequisites are allowed but nested prerequisites are allowed only on one condition
+	- For example: **V** can have prerequisites **X**, **Y** and **Z**. In this case, all **X**, **Y** and **Z** can also have prerequisites which **must have been finished**. This is to reduce complexity of the algorithm which may need much more time to design. By allowing nested prerequisites, **deadlocks** can happen. For example, when **M** refers to **N** and **N** refers back to **M** in their prerequisites. Currently, the application does not have a mechanism to prevent deadlocks. A way to deal with this is to have a pre-schedule tracing algorithm to find out the paths of all workers first before the actual scheduling algorithm takes place.
 - Category and Name of the groups of customers cannot be duplicated in the input
 	- There should always be only one record of the combination of category and name of a group of customers. For example, you cannot have two groups with "Medicare" category and "OR Lake" name in the semicolon-separated input. The combination of these two fields makes up its **primary key** of the record as in the relational database terminology. Though this can be solved, there is no point having two groups with exactly the same category-name combination.
 - No downtime for a worker to start working on the next group of customers
@@ -88,8 +88,8 @@ Top groups in top categories make up the next part of the output.
 
 From the sample output: **OR Other,WA King,WA Other**
 
-With reference to **{3,3,2}** settings, it means the top 3 groups **G** from the top 3 categories **C** will be displayed as output <u>in alphabetical order</u>.
+With reference to **{3,3,2}** settings, it means the top 3 groups **G** from the top 3 categories **C** will be displayed as output <u>in alphabetical order</u>. However, if more than one group has the same completion time (finishes at the same time), an error message *"ERROR - tie (group)"* will return.
 
-When both of these values set to 0, only the completion time will return. The selection puts higher priority in groups than categories. If the top 3 groups were all from 1 category, then the rest 2 categories would be skipped.
+When one of these values set to 0, only the completion time will return. This also ignores the tie error mentioned above. The selection puts higher priority in groups than categories. If the top 3 groups were all from 1 category, then the rest 2 categories would be skipped.
 
 On the other hand, if **{3,1,N}** was inputted and only 2 groups in the top category, the result will show only 2 group names.
