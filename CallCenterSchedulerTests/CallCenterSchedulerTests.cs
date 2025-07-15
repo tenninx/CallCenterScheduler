@@ -259,6 +259,36 @@ namespace CallCenterSchedulerTests
         }
 
         [TestMethod]
+        public void TestStartValidWithNestedPrerequisitesAndNoTopGroups()
+        {
+            // Given
+            CallCenterScheduler scheduler = new CallCenterScheduler();
+            scheduler.ParseInput("0,0,2-c,0,1;c,0-1,1,c,0;c,0-2,1,c,0;c,0-1-1,1,c,0-1;c,0-1-2,1,c,0-1;c,0-2-1,1,c,0-2;c,0-2-2,1,c,0-2");
+            scheduler.Start();
+
+            // When
+            var result = scheduler.GenerateResult();
+
+            // Then
+            Assert.AreEqual(result, "4");
+        }
+
+        [TestMethod]
+        public void TestStartValidWithTieError()
+        {
+            // Given
+            CallCenterScheduler scheduler = new CallCenterScheduler();
+            scheduler.ParseInput("2,2,0-A,a,4;A,b,3;B,b,1;B,c,4");
+            scheduler.Start();
+
+            // When
+            var result = scheduler.GenerateResult();
+
+            // Then
+            Assert.AreEqual(result, "ERROR - tie (group)");
+        }
+
+        [TestMethod]
         public void GenerateResultWithoutStart()
         {
             // Given
