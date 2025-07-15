@@ -213,9 +213,6 @@ Leave it empty and press enter to terminate. Enter your input:");
                     if (foundGroup == null)
                         return QueryResultGenerator.Generate(false, "Prerequisite '" + String.Join(",", Global.ListOfGroups[i].PrerequisiteGroups[j].Category, Global.ListOfGroups[i].PrerequisiteGroups[j].Name) + " is not found.");
 
-                    if (foundGroup.PrerequisiteGroups.Count > 0)
-                        return QueryResultGenerator.Generate(false, "Nested prerequisites at '" + String.Join(",", Global.ListOfGroups[i].Category, Global.ListOfGroups[i].Name) + "' are not supported.");
-
                     Global.ListOfGroups[i].PrerequisiteGroups[j] = foundGroup;
                 }
 
@@ -239,7 +236,8 @@ Leave it empty and press enter to terminate. Enter your input:");
                 var group = GetNextGroup(p_objQueueOfGroups, worker);
                 if (group == null)
                 {
-                    Global.Workers.Remove(worker);
+                    if (worker.FinishedGroups.Count == 0)
+                        Global.Workers.Remove(worker);
                     break;
                 }
 
