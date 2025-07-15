@@ -82,7 +82,7 @@ Leave it empty and press enter to terminate. Enter your input:");
         /// <returns>QueryResult</returns>
         public QueryResult ParseInput(string p_strInput)
         {
-            p_strInput = p_strInput.Replace("\\,", ",").Replace("\\;", ";").Trim();
+            p_strInput = p_strInput.Trim();
 
             if (p_strInput.Contains("-"))
             {
@@ -107,13 +107,13 @@ Leave it empty and press enter to terminate. Enter your input:");
 
             p_strInput = p_strInput.Substring(p_strInput.IndexOf("-") + 1).Trim();
 
-            string[] strGroups = p_strInput.Split(';');
+            string[] strGroups = SplitCharacters(p_strInput, ';');
 
             List<Group> objGroups = new List<Group>();
 
             foreach (var strGroup in strGroups)
             {
-                string[] strGroupDetails = strGroup.Trim().Split(',');
+                string[] strGroupDetails = SplitCharacters(strGroup.Trim(), ',');
                 List<Group> objPrereqs = new List<Group>();
 
                 if (strGroupDetails.Length < 3)
@@ -154,6 +154,35 @@ Leave it empty and press enter to terminate. Enter your input:");
                 return QueryResultGenerator.Generate(false, "Duplicated entry '" + String.Join(",", result.Category, result.Name) + "' found in the input data. Each group of customers should be unique by its name and category.");
 
             return LinkPrerequisites();
+        }
+
+        /// <summary>
+        /// Split a string into an array of substrings based on the specified delimiter character while ignoring escaped delimiters with a backslash.
+        /// </summary>
+        /// <param name="p_strInput">The input string</param>
+        /// <param name="p_strSplitChar">The delimiter</param>
+        /// <returns>Array of substrings by splitting the input string</returns>
+        private string[] SplitCharacters(string p_strInput, char p_strSplitChar)
+        {
+            List<string> words = new List<string>();
+            int currentIndex = 0, endIndex = 0;
+
+            while (currentIndex < p_strInput.Length)
+            {
+                endIndex = p_strInput.IndexOf(p_strSplitChar, currentIndex);
+
+                if (endIndex != -1 && p_strInput[endIndex - 1].Equals('\\'))
+                    endIndex = p_strInput.IndexOf(p_strSplitChar, endIndex + 1);
+
+                if (endIndex == -1)
+                    endIndex = p_strInput.Length;
+
+                words.Add(p_strInput.Substring(currentIndex, endIndex - currentIndex));
+
+                currentIndex = endIndex + 1;
+            }
+
+            return words.ToArray();
         }
 
         /// <summary>
@@ -209,7 +238,10 @@ Leave it empty and press enter to terminate. Enter your input:");
 
                 var group = GetNextGroup(p_objQueueOfGroups, worker);
                 if (group == null)
+                {
+                    Global.Workers.Remove(worker);
                     break;
+                }
 
                 AssignWorker(worker, group);
             }
