@@ -177,7 +177,11 @@ Leave it empty and press enter to terminate. Enter your input:");
                 if (endIndex != -1)
                 {
                     while (p_strInput[endIndex - 1].Equals('\\') && endIndex < p_strInput.Length)
+                    {
                         endIndex = p_strInput.IndexOf(p_strSplitChar, endIndex + 1);
+                        if (endIndex == -1)
+                            break;
+                    }
                 }
 
                 if (endIndex == -1)
