@@ -119,7 +119,10 @@ Leave it empty and press enter to terminate. Enter your input:");
                 if (strGroupDetails.Length < 3)
                     return QueryResultGenerator.Generate(false, "Invalid group of customers input at '" + strGroup + "'.");
 
-                if (!double.TryParse(strGroupDetails[2], out double time) && time < 0)
+                bool isValidDouble = double.TryParse(strGroupDetails[2], out double time);
+                if (!isValidDouble)
+                    return QueryResultGenerator.Generate(false, "Invalid required time input at '" + String.Join(",", strGroupDetails[0], strGroupDetails[1]) + "'.");
+                else if (time < 0)
                     return QueryResultGenerator.Generate(false, "Invalid required time input at '" + String.Join(",", strGroupDetails[0], strGroupDetails[1]) + "'.");
 
                 if (strGroupDetails.Length > 3 && (strGroupDetails.Length - 3) % 2 != 0)
@@ -171,8 +174,11 @@ Leave it empty and press enter to terminate. Enter your input:");
             {
                 endIndex = p_strInput.IndexOf(p_strSplitChar, currentIndex);
 
-                if (endIndex != -1 && p_strInput[endIndex - 1].Equals('\\'))
-                    endIndex = p_strInput.IndexOf(p_strSplitChar, endIndex + 1);
+                if (endIndex != -1)
+                {
+                    while (p_strInput[endIndex - 1].Equals('\\') && endIndex < p_strInput.Length)
+                        endIndex = p_strInput.IndexOf(p_strSplitChar, endIndex + 1);
+                }
 
                 if (endIndex == -1)
                     endIndex = p_strInput.Length;

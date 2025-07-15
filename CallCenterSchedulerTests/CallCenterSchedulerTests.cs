@@ -25,7 +25,20 @@ namespace CallCenterSchedulerTests
             CallCenterScheduler scheduler = new CallCenterScheduler();
 
             // When
-            var result = scheduler.ParseInput(@"Home,OR Jefferson\,5444;Medicare,OR Lake,1304;Medicare,WA King,43061\;Life,OR Other,12806\,Medicare,OR Lake;Life,WA Other,70944,Medicare,WA King");
+            var result = scheduler.ParseInput(@"Home,OR Jefferson\;2,5444;Medicare,OR Lake,1304;Medicare,WA King,43061;Life\,Subcategory,OR Other,12806,Medicare,OR Lake;Life,WA Other,70944,Medicare,WA King");
+
+            // Then
+            Assert.IsTrue(result.IsValidInput);
+        }
+
+        [TestMethod]
+        public void TestParseInput_WithValidNestedPrerequisites()
+        {
+            // Given
+            CallCenterScheduler scheduler = new CallCenterScheduler();
+
+            // When
+            var result = scheduler.ParseInput("Home,OR Jefferson,5444;Medicare,OR Lake,1304,Life,OR Other;Medicare,WA King,43061;Life,OR Other,12806,Medicare,OR Lake;Life,WA Other,70944,Medicare,WA King");
 
             // Then
             Assert.IsTrue(result.IsValidInput);
@@ -85,20 +98,6 @@ namespace CallCenterSchedulerTests
             // Then
             Assert.IsFalse(result.IsValidInput);
             Assert.AreEqual("Invalid prerequisites input at 'Life,WA Other'.", result.ErrorMessage);
-        }
-
-        [TestMethod]
-        public void TestParseInput_WithInvalidInput5()
-        {
-            // Given
-            CallCenterScheduler scheduler = new CallCenterScheduler();
-
-            // When
-            var result = scheduler.ParseInput("Home,OR Jefferson,5444;Medicare,OR Lake,1304,Life,OR Other;Medicare,WA King,43061;Life,OR Other,12806,Medicare,OR Lake;Life,WA Other,70944,Medicare,WA King");
-
-            // Then
-            Assert.IsFalse(result.IsValidInput);
-            Assert.AreEqual("Nested prerequisites at 'Medicare,OR Lake' are not supported.", result.ErrorMessage);
         }
 
         [TestMethod]
