@@ -45,6 +45,21 @@ namespace CallCenterSchedulerTests
         }
 
         [TestMethod]
+        public void TestConstructorWithSettings()
+        {
+            // Given
+            CallCenterScheduler scheduler = new CallCenterScheduler(1, 1, 0);
+            scheduler.ParseInput("Home,OR Jefferson,5444;Medicare,OR Lake,1304;Medicare,WA King,43061;Life,OR Other,12806,Medicare,OR Lake;Life,WA Other,70944,Medicare,WA King");
+            scheduler.Start();
+
+            // When
+            var result = scheduler.GenerateResult();
+
+            // Then
+            Assert.AreEqual(result, "114005,WA Other");
+        }
+
+        [TestMethod]
         public void TestParseInput_WithInvalidInput1()
         {
             // Given
