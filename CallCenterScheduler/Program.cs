@@ -66,6 +66,22 @@ Leave it empty and press enter to terminate. Enter your input:");
         }
 
         /// <summary>
+        /// Initialize a new instance of the CallCenterScheduler class with given settings.
+        /// </summary>
+        /// <param name="p_intTopGroups">The maximum number of top groups to be considered. Must be greater than or equal to 0; values less than 0
+        /// will default to 0.</param>
+        /// <param name="p_intTopCategories">The maximum number of top categories to be considered. Must be greater than or equal to 0; values less than
+        /// 0 will default to 0.</param>
+        /// <param name="p_intWorker">The number of workers to be allocated. Values less than or equal to 0 will default to unlimited.</param>
+        public CallCenterScheduler(int p_intTopGroups, int p_intTopCategories, int p_intWorker)
+        {
+            Init();
+            Global.NumOfTopGroups = p_intTopGroups < 0 ? 0 : p_intTopGroups;
+            Global.NumOfTopCategories = p_intTopCategories < 0 ? 0 : p_intTopCategories;
+            Global.NumOfWorkers = p_intWorker <= 0 ? int.MaxValue : p_intWorker;
+        }
+
+        /// <summary>
         /// Initialize the working environment by resetting all static properties to their default values.
         /// </summary>
         public void Init()
