@@ -115,6 +115,21 @@ namespace CallCenterSchedulerTests
         }
 
         [TestMethod]
+        public void TestParseInput_WithInvalidInput7()
+        {
+            // Given
+            CallCenterScheduler scheduler = new CallCenterScheduler();
+            scheduler.ParseInput("A,a,4,A,b;A,b,4,A,c;A,c,4,A,a");
+
+            // When
+            var result = scheduler.Start();
+
+            // Then
+            Assert.IsFalse(result.IsValidInput);
+            Assert.AreEqual("Too many recursive calls detected (more than 255). Possible circular dependencies (deadlocks) in prerequisites.", result.ErrorMessage);
+        }
+
+        [TestMethod]
         public void TestParseInput_WithValidSettings()
         {
             // Given
@@ -286,6 +301,21 @@ namespace CallCenterSchedulerTests
 
             // Then
             Assert.AreEqual(result, "ERROR - tie (group)");
+        }
+
+        [TestMethod]
+        public void TestParseInput_WithValidNestedPrerequisitesComplex()
+        {
+            // Given
+            CallCenterScheduler scheduler = new CallCenterScheduler();
+            scheduler.ParseInput("0,0,2-A,a,4,A,b;A,b,4,A,c,A,e;A,c,4,A,d;A,d,4,A,f,A,e;A,e,4;A,f,4,A,e");
+            scheduler.Start();
+
+            // When
+            var result = scheduler.GenerateResult();
+
+            // Then
+            Assert.AreEqual(result, "24");
         }
 
         [TestMethod]
