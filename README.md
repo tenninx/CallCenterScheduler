@@ -43,18 +43,32 @@ Upon execution, you will be greeted with a description explaining the input form
 > Example input using defaults: Home,OR Jefferson,5444;Medicare,OR Lake,1304;Medicare,WA King,43061;Life,OR Other,12806,Medicare,OR Lake;Life,WA Other,70944,Medicare,WA King
 > Leave it empty and press enter to terminate. Enter your input:
 
-The description is pretty clear. One important note to stress: the settings **{G},{C},{N}** must either be specified in the exact order, or none at all for using defaults. They cannot be specified individually. In addition, the settings and input data must be separated by a **dash (-)**.
+The description is pretty clear. One important note to stress: the settings **{G},{C},{N}** must either be specified in the exact order, or none at all for using defaults. They cannot be specified individually. In addition, the settings and input data must be separated by a **dash (-)**. Note that if any group or category names contain a **dash (-)**, the input string should always contain the **{G},{C},{N}** settings prefix before the **{input_data}**. This is to prevent the application from incorrectly parsing the dashed names as settings.
 
 # Conditions & Assumptions
 
 Some conditions and assumptions are in place to ensure that the application runs seamlessly. They are as follows:
 
-- Multiple groups of prerequisites are allowed but nested prerequisites are allowed only on one condition
-	- For example: **V** can have prerequisites **X**, **Y** and **Z**. In this case, all **X**, **Y** and **Z** can also have prerequisites which **must have been finished**. This is to reduce complexity of the algorithm which may need much more time to design. By allowing nested prerequisites, **deadlocks** can happen. For example, when **M** refers to **N** and **N** refers back to **M** in their prerequisites. Currently, the application does not have a mechanism to prevent deadlocks. A way to deal with this is to have a pre-schedule tracing algorithm to find out the paths of all workers first before the actual scheduling algorithm takes place.
 - Category and Name of the groups of customers cannot be duplicated in the input
 	- There should always be only one record of the combination of category and name of a group of customers. For example, you cannot have two groups with "Medicare" category and "OR Lake" name in the semicolon-separated input. The combination of these two fields makes up its **primary key** of the record as in the relational database terminology. Though this can be solved, there is no point having two groups with exactly the same category-name combination.
 - No downtime for a worker to start working on the next group of customers
 	- It is assumed that a worker starts calling the next group of customers **once becomes available** immediately. In real life, this is impossible. Nonetheless, this can be implemented easily but it is not the main point of this scheduling application.
+
+# Nested Prerequisites
+
+Any category-group can have virtually unlimited number of prerequisites. These prerequisites can again have virtually any number of prerequisites. In this case, they are called **nested prerequisites**. Regardless of any combinations, the application will complete the scheduling without issues, as long as these prerequisites are not circular/cyclic, causing a deadlock. For example, a deadlock happens when A refers to B, and B refers back to A. The application has a built-in mechanism to break out of the deadlock with an error message.
+
+This is an example of nested prerequisites and the internal calculation:
+
+|Group of Customers|Prerequisites|Worker 1 Start Time|Worker 2 Start Time|Require Time| Finished Time
+|--|--|--|--|--|--|
+|A,a|A,b||<center>20</center>|<center>4</center>|<center>24</center>
+|A,b|A,c,A,e|<center>16</center>||<center>4</center>|<center>20</center>
+|A,c|A,d||<center>12</center>|<center>4</center>|<center>16</center>
+|A,d|A,f,A,e|<center>8</center>||<center>4</center>|<center>12</center>
+|A,e||<center>0<center>||<center>4</center>|<center>4</center>
+|A,f|A,e||<center>4</center>|<center>4</center>|<center>8</center>
+
 
 # Output
 
