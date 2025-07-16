@@ -342,7 +342,7 @@ Leave it empty and press enter to terminate. Enter your input:");
 
                 for (int i = 0; i < objCurrentGroup.PrerequisiteGroups.Count; i++)
                 {
-                    var queryResult = GetPrerequisiteGroups(objCurrentGroup.PrerequisiteGroups[i], 0);
+                    var queryResult = GetPrerequisiteGroups(objCurrentGroup.PrerequisiteGroups[i], CreatePathsMap(objCurrentGroup));
                     if (!queryResult.IsValidInput)
                         return queryResult;
 
@@ -364,10 +364,10 @@ Leave it empty and press enter to terminate. Enter your input:");
         /// <param name="p_objGroup">Group of customers to check prerequisites</param>
         /// <param name="p_intDepth">Current depth of recursion to prevent circular dependencies</param>
         /// <returns>QueryResult</returns>
-        private QueryResult GetPrerequisiteGroups(Group p_objGroup, int p_intDepth)
+        private QueryResult GetPrerequisiteGroups(Group p_objGroup, List<string> p_objPaths)
         {
-            if (p_intDepth > Global.MaxPrerequisiteDepth)
-                return QueryResultGenerator.Generate(false, "Too many recursive calls detected (more than 255). Possible circular dependencies (deadlocks) in prerequisites.");
+            if (!VerifyPath(p_objPaths, p_objGroup))
+                return QueryResultGenerator.Generate(false, "Circular dependencies (deadlocks) in prerequisites.");
 
             Group group;
             double finishedTime;
@@ -385,7 +385,7 @@ Leave it empty and press enter to terminate. Enter your input:");
                         continue;
                     }
 
-                    var queryResult = GetPrerequisiteGroups(p_objGroup.PrerequisiteGroups[i], ++p_intDepth);
+                    var queryResult = GetPrerequisiteGroups(p_objGroup.PrerequisiteGroups[i], p_objPaths);
                     if (!queryResult.IsValidInput)
                         return queryResult;
 
@@ -444,10 +444,36 @@ Leave it empty and press enter to terminate. Enter your input:");
             return "ERROR - tie (group)";
         }
 
+        #region Utility Methods
         private string GetTimeString(double p_dblTime)
         {
             return p_dblTime.ToString("0.######");
         }
+
+        private string GetPath(Group p_objGroup)
+        {
+            return String.Join(",", p_objGroup.Category, p_objGroup.Name);
+        }
+
+        private List<string> CreatePathsMap(Group p_objGroup)
+        {
+            List<string> pathsMap = new List<string>();
+            pathsMap.Add(GetPath(p_objGroup));
+            return pathsMap;
+        }
+
+        private bool VerifyPath(List<string> p_objPaths, Group p_objGroup)
+        {
+            var path = GetPath(p_objGroup);
+
+            if (p_objPaths.Contains(path))
+                return false;
+
+            p_objPaths.Add(path);
+
+            return true;
+        }
+        #endregion
 
         /// <summary>
         /// Temporary storage class for working environment data. Should be reset after each input.
@@ -487,12 +513,6 @@ Leave it empty and press enter to terminate. Enter your input:");
             /// Number of workers in the call center. If set to 0, it means unlimited number of workers can be used.
             /// </summary>
             public int NumOfWorkers = 2;
-
-            /// <summary>
-            /// The maximum depth of prerequisites that can be processed. Any more than this depth will be deemed a deadlock 
-            /// and the application will break.
-            /// </summary>
-            public int MaxPrerequisiteDepth = 255;
 
             /// <summary>
             /// Total time that workers had to wait for prerequisites to be completed before they could start processing their 

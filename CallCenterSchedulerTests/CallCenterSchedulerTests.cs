@@ -141,7 +141,7 @@ namespace CallCenterSchedulerTests
 
             // Then
             Assert.IsFalse(result.IsValidInput);
-            Assert.AreEqual("Too many recursive calls detected (more than 255). Possible circular dependencies (deadlocks) in prerequisites.", result.ErrorMessage);
+            Assert.AreEqual("Circular dependencies (deadlocks) in prerequisites.", result.ErrorMessage);
         }
 
         [TestMethod]
