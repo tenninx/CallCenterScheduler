@@ -38,7 +38,12 @@ Leave it empty and press enter to terminate. Enter your input:");
                     continue;
                 }
 
-                callCenterScheduler.Start();
+                queryResult = callCenterScheduler.Start();
+                if (!queryResult.IsValidInput)
+                {
+                    Console.WriteLine("Error Message: " + queryResult.ErrorMessage + "\n");
+                    continue;
+                }
 
                 var result = callCenterScheduler.GenerateResult();
 
@@ -198,7 +203,7 @@ Leave it empty and press enter to terminate. Enter your input:");
         /// <summary>
         /// Check for duplicated entries in the list of groups. Each group should be unique by its name and category.
         /// </summary>
-        /// <returns>QueryResult</returns>
+        /// <returns>Duplicated group of customers</returns>
         private Group? CheckDuplicatedEntries()
         {
             var dupGroup = Global.ListOfGroups.GroupBy(x => new { x.Name, x.Category }).Where(g => g.Count() > 1).FirstOrDefault();
@@ -235,24 +240,27 @@ Leave it empty and press enter to terminate. Enter your input:");
         /// <summary>
         /// Start scheduling the groups of customers to workers based on their prerequisites and required time.
         /// </summary>
-        public void Start()
+        /// <returns>QueryResult</returns>
+        public QueryResult Start()
         {
             Queue<Group> p_objQueueOfGroups = new Queue<Group>(Global.ListOfGroups.OrderBy(l => l.PrerequisiteGroups.Count));
 
             while (true)
             {
-                var worker = GetWorker();
+                var queryResult = GetNextGroup(p_objQueueOfGroups);
 
-                var group = GetNextGroup(p_objQueueOfGroups, worker);
+                if (!queryResult.IsValidInput)
+                    return queryResult;
+
+                var group = (Group)queryResult.Result;
+
                 if (group == null)
-                {
-                    if (worker.FinishedGroups.Count == 0)
-                        Global.Workers.Remove(worker);
                     break;
-                }
 
-                AssignWorker(worker, group);
+                AssignWorker(group);
             }
+
+            return QueryResultGenerator.Generate(true, null);
         }
 
         /// <summary>
@@ -280,15 +288,18 @@ Leave it empty and press enter to terminate. Enter your input:");
         /// <summary>
         /// Assign a worker to a group of customers, updating the worker's next available time and the group's start time.
         /// </summary>
-        /// <param name="p_objWorker">An assigned worker</param>
         /// <param name="p_objGroup">An assigned group of customers</param>
-        private void AssignWorker(Worker p_objWorker, Group p_objGroup)
+        private void AssignWorker(Group p_objGroup)
         {
+            Worker p_objWorker = GetWorker();
+
             p_objWorker.WorkingOn = p_objGroup;
 
             if (p_objWorker.NextAvailableTime < p_objGroup.MinTimeBeforeStart)
             {
-                Global.WaitedTime += p_objGroup.MinTimeBeforeStart - p_objWorker.NextAvailableTime;
+                double waitedTime = p_objGroup.MinTimeBeforeStart - p_objWorker.NextAvailableTime;
+                p_objWorker.WaitedTime += waitedTime;
+                Global.WaitedTime += waitedTime;
                 p_objWorker.NextAvailableTime = p_objGroup.MinTimeBeforeStart;
             }
 
@@ -304,9 +315,8 @@ Leave it empty and press enter to terminate. Enter your input:");
         /// Get the next group of customers from the queue, checking if it has prerequisites that need to be completed first.
         /// </summary>
         /// <param name="p_objQueueOfGroups">Queue of groups of customers</param>
-        /// <param name="p_objWorker">An assigned worker</param>
-        /// <returns>Group of customers</returns>
-        private Group? GetNextGroup(Queue<Group> p_objQueueOfGroups, Worker p_objWorker)
+        /// <returns>QueryResult</returns>
+        private QueryResult GetNextGroup(Queue<Group> p_objQueueOfGroups)
         {
             while (p_objQueueOfGroups.Count > 0)
             {
@@ -314,48 +324,66 @@ Leave it empty and press enter to terminate. Enter your input:");
                 if (objCurrentGroup.IsCompleted)
                     continue;
 
-                if (objCurrentGroup.PrerequisiteGroups.Count > 0)
+                for (int i = 0; i < objCurrentGroup.PrerequisiteGroups.Count; i++)
                 {
-                    var result = GetPrerequisiteGroups(objCurrentGroup, p_objWorker);
+                    var queryResult = GetPrerequisiteGroups(objCurrentGroup.PrerequisiteGroups[i], 0);
+                    if (!queryResult.IsValidInput)
+                        return queryResult;
 
-                    if (!result.IsValidInput)
-                    {
-                        Console.WriteLine("Error Message: " + result.ErrorMessage);
-                        return null;
-                    }
-
-                    if (((List<Group>)result.Result).Count > 0)
-                    {
-                        p_objQueueOfGroups.Enqueue(objCurrentGroup);
-                        return ((List<Group>)result.Result).First();
-                    }
+                    var result = (Group)queryResult.Result;
+                    var finishedTime2 = result.StartTime + result.RequiredTime;
+                    if (objCurrentGroup.MinTimeBeforeStart < finishedTime2)
+                        objCurrentGroup.MinTimeBeforeStart = finishedTime2;
                 }
 
-                return objCurrentGroup;
+                return QueryResultGenerator.Generate(true, objCurrentGroup);
             }
 
-            return null;
+            return QueryResultGenerator.Generate(true, null);
         }
 
         /// <summary>
         /// Get the prerequisite groups for a given group, checking if they have been completed or if the worker can start them based on their next available time.
         /// </summary>
         /// <param name="p_objGroup">Group of customers to check prerequisites</param>
-        /// <param name="p_objWorker">An assigned worker</param>
+        /// <param name="p_intDepth">Current depth of recursion to prevent circular dependencies</param>
         /// <returns>QueryResult</returns>
-        private QueryResult GetPrerequisiteGroups(Group p_objGroup, Worker p_objWorker)
+        private QueryResult GetPrerequisiteGroups(Group p_objGroup, int p_intDepth)
         {
-            var finishedGroup = Global.FinishedGroups.Find(x => x == p_objGroup.PrerequisiteGroups.First());
-            if (finishedGroup != null)
-                p_objGroup.MinTimeBeforeStart = finishedGroup.StartTime + finishedGroup.RequiredTime;
-            else
+            if (p_intDepth > Global.MaxPrerequisiteDepth)
+                return QueryResultGenerator.Generate(false, "Too many recursive calls detected (more than 255). Possible circular dependencies (deadlocks) in prerequisites.");
+
+            Group group;
+            double finishedTime;
+
+            if (!p_objGroup.IsCompleted)
             {
-                double minTime = p_objWorker.NextAvailableTime + p_objGroup.PrerequisiteGroups.First().RequiredTime;
-                if (p_objGroup.MinTimeBeforeStart < minTime)
-                    p_objGroup.MinTimeBeforeStart = minTime;
+                for (int i = 0; i < p_objGroup.PrerequisiteGroups.Count; i++)
+                {
+                    if (p_objGroup.PrerequisiteGroups[i].IsCompleted)
+                    {
+                        group = Global.FinishedGroups.Find(x => x == p_objGroup.PrerequisiteGroups[i]);
+                        finishedTime = group.StartTime + group.RequiredTime;
+                        if (p_objGroup.MinTimeBeforeStart < finishedTime)
+                            p_objGroup.MinTimeBeforeStart = finishedTime;
+                        continue;
+                    }
+
+                    var queryResult = GetPrerequisiteGroups(p_objGroup.PrerequisiteGroups[i], ++p_intDepth);
+                    if (!queryResult.IsValidInput)
+                        return queryResult;
+
+                    group = (Group)queryResult.Result;
+
+                    finishedTime = group.StartTime + group.RequiredTime;
+                    if (p_objGroup.MinTimeBeforeStart < finishedTime)
+                        p_objGroup.MinTimeBeforeStart = finishedTime;
+                }
+
+                AssignWorker(p_objGroup);
             }
 
-            return QueryResultGenerator.Generate(true, p_objGroup.PrerequisiteGroups.Where(p => !p.IsCompleted).ToList());
+            return QueryResultGenerator.Generate(true, p_objGroup);
         }
 
         /// <summary>
@@ -445,6 +473,12 @@ Leave it empty and press enter to terminate. Enter your input:");
             public int NumOfWorkers = 2;
 
             /// <summary>
+            /// The maximum depth of prerequisites that can be processed. Any more than this depth will be deemed a deadlock 
+            /// and the application will break.
+            /// </summary>
+            public int MaxPrerequisiteDepth = 255;
+
+            /// <summary>
             /// Total time that workers had to wait for prerequisites to be completed before they could start processing their 
             /// assigned groups. For debugging purpose.
             /// </summary>
@@ -514,6 +548,11 @@ Leave it empty and press enter to terminate. Enter your input:");
         /// List of groups that the worker has finished processing. For debugging purpose.
         /// </summary>
         public List<Group> FinishedGroups = new List<Group>();
+
+        /// <summary>
+        /// Total idling time of the worker waiting for the next group. For debugging purpose.
+        /// </summary>
+        public double WaitedTime;
     }
 
     /// <summary>
